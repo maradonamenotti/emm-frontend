@@ -489,10 +489,12 @@ function AppContent() {
     window.open(`${API_URL}/api/students/${student.id}/certificate`, '_blank');
   };
 
+  /* DESACTIVADO TEMPORALMENTE
   const downloadDiploma = (student: StudentData) => {
     if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
     window.open(`${API_URL}/api/students/${student.id}/diploma`, '_blank');
   };
+  */
 
   // Descarga el PDF y marca automáticamente como Emitido
   const downloadPDFAndEmit = async (student: StudentData) => {
