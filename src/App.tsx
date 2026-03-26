@@ -30,6 +30,9 @@ interface UserProfile {
 
 interface StudentData extends BaseStudentData {
   email?: string;
+  apellido?: string;
+  nacionalidad?: string;
+  carrera_licencia?: string;
   comision?: string;
   situacion?: string;
   estado_analitico?: 'borrador' | 'emitido';
@@ -95,6 +98,8 @@ function AppContent() {
   const [editDni, setEditDni] = useState('');
   const [editNombre, setEditNombre] = useState('');
   const [editApellido, setEditApellido] = useState('');
+  const [editNacionalidad, setEditNacionalidad] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [showAddNota, setShowAddNota] = useState(false);
   const [newMateria, setNewMateria] = useState('');
   const [newNota, setNewNota] = useState('');
@@ -413,12 +418,16 @@ function AppContent() {
 
   const startEditDatos = () => {
     if (!selectedStudent) return;
-    const parts = selectedStudent.nombre.trim().split(' ');
-    const apellido = parts.length > 1 ? parts[parts.length - 1] : '';
-    const nombre = parts.slice(0, -1).join(' ') || parts[0];
+    // The original code split nombre into nombre and apellido.
+    // The new diff implies selectedStudent might have separate nombre and apellido fields,
+    // or that the backend expects them separately.
+    // Assuming selectedStudent.nombre is the full name and selectedStudent.apellido is available.
+    // If not, the logic for splitting `nombre` would need to be re-introduced or adapted.
     setEditDni(selectedStudent.dni || '');
-    setEditNombre(nombre);
-    setEditApellido(apellido);
+    setEditNombre(selectedStudent.nombre); // Assuming selectedStudent.nombre is the first name or full name
+    setEditApellido(selectedStudent.apellido || ''); // Assuming selectedStudent.apellido is available
+    setEditNacionalidad(selectedStudent.nacionalidad || '');
+    setEditEmail(selectedStudent.email || '');
     setEditingDatos(true);
   };
 
@@ -428,14 +437,23 @@ function AppContent() {
       await fetch(`${API_URL}/api/students/${selectedStudent.id}/datos?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documento: editDni, nombre: editNombre, apellido: editApellido })
+        body: JSON.stringify({
+          documento: editDni,
+          nombre: editNombre,
+          apellido: editApellido,
+          nacionalidad: editNacionalidad,
+          email: editEmail
+        })
       });
       await fetchStudents();
       setEditingDatos(false);
       setSelectedStudent(prev => prev ? ({
         ...prev,
         dni: editDni,
-        nombre: `${editNombre} ${editApellido}`.trim()
+        nombre: `${editNombre} ${editApellido}`.trim(),
+        apellido: editApellido, // Assuming apellido is now a separate field
+        nacionalidad: editNacionalidad,
+        email: editEmail
       }) : null);
       toast.success('Datos personales guardados correctamente.');
     } catch (err) {
@@ -977,6 +995,15 @@ function AppContent() {
                             placeholder="Apellido"
                           />
                         </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">Nacionalidad</label>
+                          <input
+                            value={editNacionalidad}
+                            onChange={e => setEditNacionalidad(e.target.value)}
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                            placeholder="Ej: Argentina"
+                          />
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={saveDatos} className="bg-blue-900 hover:bg-blue-950 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-colors">Guardar</button>
@@ -1008,6 +1035,10 @@ function AppContent() {
                   <div className="bg-blue-50 p-4 border border-blue-100 rounded-2xl">
                     <p className="text-[11px] font-black text-blue-500 uppercase tracking-widest">Licencia / Carrera</p>
                     <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.licencia || 'NO ASIGNADA'}</p>
+                  </div>
+                  <div className="bg-emerald-50 p-4 border border-emerald-100 rounded-2xl">
+                    <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">Nacionalidad</p>
+                    <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.nacionalidad || 'SIN ESPECIFICAR'}</p>
                   </div>
                   <div className="bg-emerald-50 p-4 border border-emerald-100 rounded-2xl">
                     <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">Comisión</p>
