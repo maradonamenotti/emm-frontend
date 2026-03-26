@@ -20,7 +20,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';
 
-type UserRole = 'admin' | 'staff' | 'student';
+type UserRole = 'admin' | 'operadora' | 'student';
 
 interface UserProfile {
   email: string;
@@ -160,6 +160,7 @@ function AppContent() {
         return;
       }
       setUser({ email: data.email, role: data.role, name: data.nombre });
+      if (data.role === 'operadora') setActiveTab('alumnos');
       setError('');
     } catch (err) {
       setError('Error de conexión con el servidor');
@@ -616,7 +617,7 @@ function AppContent() {
           <p className="text-slate-500 text-sm">Sincronice el padrón e importe notas para generar certificados.</p>
         </div>
 
-        {(user.role === 'admin' || user.role === 'staff') && (
+        {user.role === 'admin' && (
           <div className="flex items-center justify-end gap-3 flex-wrap">
             <button
               onClick={async () => {
@@ -793,7 +794,7 @@ function AppContent() {
 
                     {/* Quick actions row */}
                     <div className="flex items-center gap-1 border-l pl-3 border-slate-100" onClick={(e) => e.stopPropagation()}>
-                      {(user.role === 'admin' || user.role === 'staff') && (
+                      {user.role === 'admin' && (
                         <button
                           onClick={() => handleDelete(student.id as any)}
                           className="p-2 text-red-400 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
@@ -895,7 +896,7 @@ function AppContent() {
                         {selectedStudent.email && (
                           <span className="bg-white border border-slate-200 px-3 py-1 rounded shadow-sm">Email: {selectedStudent.email}</span>
                         )}
-                        {(user?.role === 'admin' || user?.role === 'staff') && (
+                        {(user?.role === 'admin' || user?.role === 'operadora') && (
                           <button
                             onClick={startEditDatos}
                             className="text-blue-600 hover:text-blue-800 text-xs font-bold border border-blue-200 bg-blue-50 px-2 py-0.5 rounded transition-colors"
@@ -978,7 +979,7 @@ function AppContent() {
 
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-slate-900">Materias Aprobadas ({selectedStudent.notas?.length || 0})</h3>
-                  {(user?.role === 'admin' || user?.role === 'staff') && (
+                  {(user?.role === 'admin' || user?.role === 'operadora') && (
                     <button
                       onClick={() => setShowAddNota(prev => !prev)}
                       className="text-xs font-bold bg-blue-900 hover:bg-blue-950 text-white px-3 py-1.5 rounded-lg transition-colors"
@@ -1075,7 +1076,7 @@ function AppContent() {
                           <div key={i} className={`flex justify-between items-center px-4 py-2.5 border-b border-slate-50 last:border-0 transition-colors ${tiene && !hasPending ? 'bg-white' : hasPending ? 'bg-yellow-50' : 'bg-amber-50'}`}>
                             <span className="font-medium text-slate-700 text-sm flex-1 pr-4">{materia}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                              {(user?.role === 'admin' || user?.role === 'staff') ? (
+                              {(user?.role === 'admin' || user?.role === 'operadora') ? (
                                 <>
                                   <input
                                     type="number"
@@ -1331,13 +1332,15 @@ function AppContent() {
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-3">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-blue-800 text-white font-bold shadow-inner border border-blue-700/50' : 'text-blue-200/80 hover:bg-blue-900 hover:text-white font-medium'}`}
-          >
-            <LayoutDashboard className={`w-5 h-5 ${activeTab === 'dashboard' ? 'text-blue-300' : ''}`} />
-            Dashboard
-          </button>
+          {user.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-blue-800 text-white font-bold shadow-inner border border-blue-700/50' : 'text-blue-200/80 hover:bg-blue-900 hover:text-white font-medium'}`}
+            >
+              <LayoutDashboard className={`w-5 h-5 ${activeTab === 'dashboard' ? 'text-blue-300' : ''}`} />
+              Dashboard
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('alumnos')}
             className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-blue-800 text-white font-bold shadow-inner border border-blue-700/50' : 'text-blue-200/80 hover:bg-blue-900 hover:text-white font-medium'}`}
