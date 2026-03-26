@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-maradona-blue: #007bc0;
+  --color-maradona-gold: #c3922e;
+}
+
+body {
+  background-color: #f3f4f6;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
