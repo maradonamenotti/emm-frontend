@@ -503,9 +503,9 @@ function AppContent() {
       toast.error("⚠️ Generado: Faltan notas obligatorias.");
     }
 
-    // 1. Descargar Analítico y Diploma
+    // 1. Descargar Analítico
     downloadPDF(student);
-    setTimeout(() => downloadDiploma(student), 800);
+    // setTimeout(() => downloadDiploma(student), 800); // DESACTIVADO TEMPORALMENTE
 
     // 2. Marcar como Emitido si todavía no lo estaba
     if (student.estado_analitico !== 'emitido') {
@@ -861,7 +861,8 @@ function AppContent() {
                           <Download className="w-5 h-5" />
                         </button>
                       )}
-                      {student.estado_analitico === 'emitido' && (
+                      {/* 
+                         student.estado_analitico === 'emitido' && (
                         <button
                           onClick={() => downloadDiploma(student)}
                           className="p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 rounded-lg transition-colors"
@@ -869,7 +870,7 @@ function AppContent() {
                         >
                           <School className="w-5 h-5" />
                         </button>
-                      )}
+                      ) */}
                     </div>
                   </div>
                 </motion.div>
@@ -1282,7 +1283,7 @@ function AppContent() {
                   )}
 
                   {/* Descargar Diploma — solo si ya está emitido */}
-                  {selectedStudent.estado_analitico === 'emitido' && (
+                  {/* {selectedStudent.estado_analitico === 'emitido' && (
                     <button
                       onClick={() => downloadDiploma(selectedStudent)}
                       className="px-5 py-2.5 rounded-xl font-bold flex gap-2 items-center transition-all border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900"
@@ -1290,7 +1291,7 @@ function AppContent() {
                     >
                       <School className="w-4 h-4" /> Diploma
                     </button>
-                  )}
+                  )} */}
 
                   {/* Vista previa — no cambia el estado */}
                   <button
