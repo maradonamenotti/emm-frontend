@@ -123,7 +123,7 @@ function AppContent() {
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedStudent(null);
+      if (e.key === 'Escape') closeStudentModal();
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
@@ -220,12 +220,24 @@ function AppContent() {
     await fetchAppUsers();
   };
 
+  const closeStudentModal = () => {
+    setSelectedStudent(null);
+    setEditingDatos(false);
+    setShowAddNota(false);
+    setEditDni('');
+    setEditNombre('');
+    setEditApellido('');
+    setEditNacionalidad('');
+    setEditEmail('');
+    setPendingNotas({});
+  };
+
   const handleLogout = () => {
     setUser(null);
     setEmail('');
     setPassword('');
     setStudents([]);
-    setSelectedStudent(null);
+    closeStudentModal();
     setAppUsers([]);
     setActiveTab('dashboard');
   };
@@ -315,7 +327,7 @@ function AppContent() {
         try {
           await fetch(`${API_URL}/api/students/${id}?user=${encodeURIComponent(user?.email || 'Sistema')}`, { method: 'DELETE' });
           setStudents(prev => prev.filter(s => s.id !== id));
-          if (selectedStudent?.id === id) setSelectedStudent(null);
+          if (selectedStudent?.id === id) closeStudentModal();
         } catch (err) {
           toast.error('Error al eliminar');
         }
@@ -463,7 +475,7 @@ function AppContent() {
           if (res.ok) {
             toast.success(data.message || 'Base de datos reiniciada.');
             fetchStudents();
-            setSelectedStudent(null);
+            closeStudentModal();
           } else {
             toast.error(data.error || 'Error al reiniciar');
           }
@@ -1188,7 +1200,7 @@ try {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 shadow-2xl"
-            onClick={() => setSelectedStudent(null)}
+            onClick={closeStudentModal}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -1267,7 +1279,7 @@ try {
                   )}
                 </div>
                 <button
-                  onClick={() => setSelectedStudent(null)}
+                  onClick={closeStudentModal}
                   className="p-2 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-full transition-colors shrink-0 ml-4"
                 >
                   <X className="w-5 h-5" />
