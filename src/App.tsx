@@ -107,7 +107,7 @@ function AppContent() {
 
   const isAnaliticoCompleto = (student: StudentData) => {
     const required = getSubjectsByLicencia(student.licencia || '');
-    if (required.length === 0) return true;
+    
     return required.every(sub =>
       student.notas?.some(n => n.materia.toUpperCase() === sub.toUpperCase() && n.nota > 0)
     );
@@ -777,27 +777,6 @@ function AppContent() {
                 <span>Eliminar {selectedStudents.length}</span>
               </button>
             )}
-            <button
-              onClick={async () => {
-                if (!confirm('¿Quitar todos los acentos de los nombres y apellidos de la base de datos?')) return;
-                setIsUploading(true);
-                try {
-                  await fetch(`${API_URL}/api/students/remove-accents?user=${encodeURIComponent(user?.email || 'Sistema')}`, { method: 'POST' });
-                  await fetchStudents();
-                  alert('Acentos eliminados correctamente.');
-                } catch (e) {
-                  alert('Error eliminando acentos');
-                } finally {
-                  setIsUploading(false);
-                }
-              }}
-              disabled={isUploading}
-              className={`flex items-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title="Eliminar acentos de todos los alumnos"
-            >
-              <span className="font-bold text-sm leading-none">A^</span>
-              <span>Limpiar Acentos</span>
-            </button>
             <label className={`flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl cursor-pointer transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <Upload className="w-4 h-4" />
               <span>Sincronizar QUINTTOS</span>
@@ -806,10 +785,6 @@ function AppContent() {
             <button onClick={() => setImportConfig({ isOpen: true, mode: 'db' })} disabled={isUploading} className={`flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <Upload className="w-4 h-4" />
               <span>Importar Notas</span>
-            </button>
-            <button onClick={() => setImportConfig({ isOpen: true, mode: 'zip' })} disabled={isUploading} className={`flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <FileText className="w-4 h-4" />
-              <span>Generar Analíticos ZIP</span>
             </button>
           </div>
         )}
@@ -970,11 +945,6 @@ function AppContent() {
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${isAnaliticoCompleto(student) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
                       {isAnaliticoCompleto(student) ? 'Completo' : 'Incompleto'}
                     </span>
-                    {student.situacion && student.situacion !== 'DUPLICADO' && (
-                      <span className="md:hidden lg:inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider rounded-lg border border-indigo-100 whitespace-nowrap">
-                        {student.situacion}
-                      </span>
-                    )}
                     {(!student.notas || student.notas.length === 0) && (
                       <span className="text-amber-700 font-bold text-xs bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">Esperando Notas</span>
                     )}
