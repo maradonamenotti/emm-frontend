@@ -92,6 +92,7 @@ function AppContent() {
   // Modal de confirmación personalizado
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (val: string) => void; type?: 'danger' | 'warning' | 'info'; withInput?: boolean; inputLabel?: string; inputPlaceholder?: string }>({ open: false, title: '', message: '', onConfirm: () => { } });
   const [confirmInput, setConfirmInput] = useState('');
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [editingDatos, setEditingDatos] = useState(false);
@@ -337,6 +338,58 @@ function AppContent() {
           toast.error('Error al eliminar notas');
         }
         setConfirmModal(prev => ({ ...prev, open: false }));
+      }
+    });
+  };
+
+  const toggleSelectStudent = (id: string) => {
+    setSelectedStudents(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const currentIds = filteredStudents
+      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+      .map(s => s.id)
+      .filter((id): id is string => !!id);
+    
+    if (currentIds.every(id => selectedStudents.includes(id))) {
+      setSelectedStudents(prev => prev.filter(id => !currentIds.includes(id)));
+    } else {
+      setSelectedStudents(prev => [...new Set([...prev, ...currentIds])]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedStudents.length === 0) return;
+    setConfirmModal({
+      open: true,
+      title: 'Eliminar Seleccionados',
+      message: `¿Estás seguro de que deseas eliminar los ${selectedStudents.length} alumnos seleccionados? Esta acción es permanente.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setIsUploading(true);
+        try {
+          const res = await fetch(`${API_URL}/api/students/bulk?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: selectedStudents })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            toast.success(data.message || 'Alumnos eliminados correctamente.');
+            setSelectedStudents([]);
+            fetchStudents();
+          } else {
+            toast.error(data.error || 'Error al eliminar alumnos.');
+          }
+        } catch (err) {
+          toast.error('Error de conexión.');
+        } finally {
+          setIsUploading(false);
+          setConfirmModal(prev => ({ ...prev, open: false }));
+        }
       }
     });
   };
@@ -713,6 +766,17 @@ function AppContent() {
               <Trash2 className="w-4 h-4" />
               <span>Reiniciar BD</span>
             </button>
+            {selectedStudents.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={isUploading}
+                className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="Eliminar alumnos seleccionados"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Eliminar {selectedStudents.length}</span>
+              </button>
+            )}
             <button
               onClick={async () => {
                 if (!confirm('¿Quitar todos los acentos de los nombres y apellidos de la base de datos?')) return;
@@ -833,6 +897,17 @@ function AppContent() {
 
         {/* LIST VIEW INSTED OF GRID */}
         <div className="flex flex-col space-y-3">
+          {filteredStudents.length > 0 && (
+            <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 mb-2">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer"
+                checked={filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).every(s => s.id && selectedStudents.includes(s.id))}
+                onChange={toggleSelectAll}
+              />
+              <span className="text-sm font-bold text-slate-600">Seleccionar todos en esta página</span>
+            </div>
+          )}
           <AnimatePresence mode="popLayout">
             {filteredStudents.length > 0 ? (
               filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((student, idx) => (
@@ -842,15 +917,30 @@ function AppContent() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   onClick={() => setSelectedStudent(student)}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group ${student.situacion === 'DUPLICADO'
-                    ? 'bg-rose-50 border-rose-300 hover:border-rose-400 hover:shadow-md'
-                    : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300'
-                    }`}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group ${
+                    selectedStudents.includes(student.id || '') 
+                      ? 'bg-blue-50 border-blue-400 shadow-md ring-1 ring-blue-400' 
+                      : student.situacion === 'DUPLICADO'
+                        ? 'bg-rose-50 border-rose-300 hover:border-rose-400 hover:shadow-md'
+                        : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300'
+                  }`}
                 >
-                  {/* Left: Icon, Details */}
+                  {/* Left: Checkbox, Icon, Details */}
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl hidden sm:flex shrink-0 transition-colors ${student.situacion === 'DUPLICADO' ? 'bg-rose-100 group-hover:bg-rose-200' : 'bg-blue-50 group-hover:bg-blue-100'
-                      }`}>
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer"
+                      checked={selectedStudents.includes(student.id || '')}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelectStudent(student.id || '')}
+                    />
+                    <div className={`p-3 rounded-xl hidden sm:flex shrink-0 transition-colors ${
+                      selectedStudents.includes(student.id || '')
+                        ? 'bg-blue-200 text-blue-900'
+                        : student.situacion === 'DUPLICADO' 
+                          ? 'bg-rose-100 group-hover:bg-rose-200' 
+                          : 'bg-blue-50 group-hover:bg-blue-100'
+                    }`}>
                       <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : 'text-blue-900'}`} />
                     </div>
                     <div>

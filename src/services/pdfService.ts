@@ -22,6 +22,25 @@ const numberToWords = (n: number): string => {
 
 export const LICENCIA_SUBJECTS: Record<string, string[]> = {
   // Licencia CB — materias exactas del certificado PDF
+  "C": [
+    "METODOLOGÍA DE LA ENSEÑANZA I",
+    "TÉCNICA TÁCTICA Y ESTRATEGIA I",
+    "MEDICINA I",
+    "FÚTBOL Y CULTURA",
+    "COMPETENCIAS PARA LA VIDA",
+    "REGLAMENTO I"
+  ],
+  "B": [
+    "METODOLOGÍA DE LA ENSEÑANZA II",
+    "TÉCNICA TÁCTICA Y ESTRATEGIA II",
+    "REGLAMENTO II",
+    "PREPARACIÓN FÍSICA I",
+    "MEDICINA II",
+    "PLANIFICACIÓN DEL ENTRENAMIENTO I",
+    "PSICOLOGÍA I",
+    "ÉTICA Y VALORES",
+    "HISTORIA DEL FÚTBOL ARGENTINO"
+  ],
   "CB": [
     "METODOLOGÍA DE LA ENSEÑANZA I",
     "TÉCNICA TÁCTICA Y ESTRATEGIA I",
@@ -37,8 +56,7 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "PLANIFICACIÓN DEL ENTRENAMIENTO I",
     "PSICOLOGÍA I",
     "ÉTICA Y VALORES",
-    "HISTORIA DEL FÚTBOL ARGENTINO",
-    "PROMEDIO GENERAL DE PRÁCTICAS"
+    "HISTORIA DEL FÚTBOL ARGENTINO"
   ],
   "A": [
     "TÉCNICA, TÁCTICA Y ESTRATEGIA III",
@@ -51,8 +69,7 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "PREPARACIÓN FÍSICA II",
     "PSICOLOGÍA III",
     "MEDICINA III",
-    "REGLAMENTO III",
-    "PROMEDIO GENERAL DE PRÁCTICAS"
+    "REGLAMENTO III"
   ],
   "PRO": [
     "TÉCNICA, TÁCTICA Y ESTRATEGIA PRO",
@@ -66,8 +83,7 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "TECNOLOGÍA APLICADA",
     "PSICOLOGÍA PRO",
     "RECURSOS HUMANOS",
-    "FÚTBOL INTERNACIONAL",
-    "PROMEDIO GENERAL DE PRÁCTICAS"
+    "FÚTBOL INTERNACIONAL"
   ]
 };
 
