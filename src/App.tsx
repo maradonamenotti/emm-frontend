@@ -966,7 +966,7 @@ function AppContent() {
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-slate-900 mb-0.5 line-clamp-1">
-                        {student.nombre} {student.situacion === 'DUPLICADO' && <span className="text-rose-600 text-sm ml-2">(DUPLICADO)</span>}
+                        {student.nombre} {student.apellido && student.apellido !== 'Sin Apellido' && !student.nombre.includes(student.apellido) ? student.apellido : ''} {student.situacion === 'DUPLICADO' && <span className="text-rose-600 text-sm ml-2">(DUPLICADO)</span>}
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs font-semibold mt-1">
                         <span className="flex items-center gap-1 text-slate-500">DNI: {student.dni}</span>
