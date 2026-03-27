@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import {
@@ -92,6 +92,8 @@ function AppContent() {
   // Modal de confirmación personalizado
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void; type?: 'danger' | 'warning' | 'info'; withInput?: boolean; inputLabel?: string; inputPlaceholder?: string }>({ open: false, title: '', message: '', onConfirm: () => { } });
   const [confirmInput, setConfirmInput] = useState('');
+  const confirmInputRef = useRef('');
+  useEffect(() => { confirmInputRef.current = confirmInput; }, [confirmInput]);
 
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [editingDatos, setEditingDatos] = useState(false);
@@ -352,7 +354,7 @@ function AppContent() {
       inputLabel: 'Confirmación',
       inputPlaceholder: 'BORRAR TODO',
       onConfirm: async () => {
-        if (confirmInput.trim() !== 'BORRAR TODO') {
+        if (confirmInputRef.current.trim() !== 'BORRAR TODO') {
           toast.error('La palabra de confirmación no coincide.');
           return;
         }
@@ -534,9 +536,9 @@ function AppContent() {
   const downloadPDFAndEmit = async (student: StudentData) => {
     if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
 
-    // VALIDACION: Solo si tiene todas las notas
+    // Alerta informativa pero NO bloqueante
     if (!isAnaliticoCompleto(student)) {
-      toast.error("⚠️ Generado: Faltan notas obligatorias.");
+      toast.error('⚠️ El analítico está INCOMPLETO, pero se generará igual.');
     }
 
     // 1. Descargar Analítico
@@ -874,8 +876,11 @@ function AppContent() {
                   </div>
 
                   <div className="flex items-center justify-between w-full md:w-auto gap-4 border-t md:border-0 pt-3 md:pt-0 border-slate-100">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold md:hidden lg:inline-block uppercase tracking-wider border ${student.estado_analitico === 'emitido' ? (isAnaliticoCompleto(student) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200') : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                      {student.estado_analitico === 'emitido' ? (isAnaliticoCompleto(student) ? 'Emitido' : 'Generado: Faltan Notas') : 'Borrador'}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${student.estado_analitico === 'emitido' ? 'bg-blue-900 text-white border-blue-900' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                      {student.estado_analitico === 'emitido' ? 'Emitido' : 'Borrador'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${isAnaliticoCompleto(student) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
+                      {isAnaliticoCompleto(student) ? 'Completo' : 'Incompleto'}
                     </span>
                     {student.situacion && student.situacion !== 'DUPLICADO' && (
                       <span className="md:hidden lg:inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider rounded-lg border border-indigo-100 whitespace-nowrap">
