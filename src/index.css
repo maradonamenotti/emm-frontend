@@ -1,11 +1,29 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;600&family=Montserrat:wght@700;800&family=Poppins:wght@400;500;600;700&display=swap');
 
 @theme {
-  --color-maradona-blue: #007bc0;
-  --color-maradona-gold: #c3922e;
+  --color-ink: #002d2b;
+  --color-teal: #00968f;
+  --color-aqua: #0ffff4;
+  --color-night: #0c1a1a;
+  --color-cloud: #f3f6f8;
+}
+
+:root {
+  color: #0f172a;
+  background: radial-gradient(circle at 20% 20%, #0ffff418 0, transparent 30%), radial-gradient(circle at 80% 0%, #00968f1c 0, transparent 28%), #f7f9fb;
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  min-height: 100%;
+  letter-spacing: 0.01em;
 }
 
 body {
-  background-color: #f3f4f6;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  background: transparent;
+  font-size: 15px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', 'Josefin Sans', 'Poppins', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.01em;
 }

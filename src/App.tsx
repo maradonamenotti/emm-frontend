@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';
+import logo from './assets/logo.png';
 
 type UserRole = 'admin' | 'editor' | 'viewer' | 'student';
 
@@ -75,11 +76,14 @@ function AppContent() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [students, setStudents] = useState<StudentData[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [licenciaFilter, setLicenciaFilter] = useState('all');
+  const [comisionFilter, setComisionFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'ok' | 'error'>('checking');
@@ -158,7 +162,7 @@ function AppContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, licenciaFilter, comisionFilter]);
 
   useEffect(() => {
     if (user) {
@@ -185,6 +189,18 @@ function AppContent() {
       setError('');
     } catch (err) {
       setError('Error de conexión con el servidor');
+    }
+  };
+
+  const loadStudentDetail = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/students/${id}`);
+      const data = await res.json();
+      if (data && data.data) {
+        setSelectedStudent(data.data);
+      }
+    } catch (err) {
+      console.warn('No se pudo cargar el detalle del alumno');
     }
   };
 
@@ -266,7 +282,7 @@ function AppContent() {
           throw new Error(err.error || 'Error al importar en servidor');
         }
         const result = await res.json();
-        toast.success(`Se vincularon notas a ${result.data.matchCount} alumnos. ${result.data.noMatchCount} DNIs sin registro.`);
+        toast.success(`Se vincularon notas a ${result.data.matchCount} alumnos. ${result.data.noMatchCount} IDs sin registro.`);
         await fetchStudents();
       } else {
         const res = await fetch(`${API_URL}/api/generate-certificates`, { method: 'POST', body: submitData });
@@ -519,6 +535,7 @@ function AppContent() {
         await fetchStudents();
         if (selectedStudent?.id === id) {
           setSelectedStudent(prev => prev ? ({ ...prev, estado_analitico: data.estado }) : null);
+          loadStudentDetail(id);
         }
         toast.success(nuevoEstado === 'emitido' ? '¡Analítico Emitido!' : 'Revertido a Borrador');
       } catch (err: any) {
@@ -670,13 +687,14 @@ function AppContent() {
         const data = await res.json();
         await fetchStudents();
         setSelectedStudent(prev => prev ? ({ ...prev, estado_analitico: data.estado }) : null);
+        if (student.id) loadStudentDetail(student.id);
       } catch (err) { console.error('No se pudo marcar como Emitido:', err); }
     }
   };
 
   const exportToExcel = () => {
     const dataToExport = filteredStudents.map(student => ({
-      DNI: student.dni,
+      ID: student.dni,
       Nombre: student.nombre,
       Email: student.email || '',
       'Licencia/Carrera': student.licencia || '',
@@ -696,64 +714,88 @@ function AppContent() {
   };
 
   const uniqueStatuses = Array.from(new Set(students.map(s => s.situacion).filter(Boolean)));
+  const uniqueLicencias = Array.from(new Set(students.map(s => s.licencia).filter(Boolean)));
+  const uniqueComisiones = Array.from(new Set(students.map(s => s.comision).filter(Boolean)));
 
   const filteredStudents = students.filter(s => {
     const matchesSearch = s.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || s.dni.includes(searchTerm);
     const matchesStatus = statusFilter === 'all' || s.situacion === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesLicencia = licenciaFilter === 'all' || (s.licencia || '').toUpperCase() === licenciaFilter.toUpperCase();
+    const matchesComision = comisionFilter === 'all' || (s.comision || '').toUpperCase() === comisionFilter.toUpperCase();
+    return matchesSearch && matchesStatus && matchesLicencia && matchesComision;
   });
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+      <div
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{
+          backgroundImage: `
+            radial-gradient(circle at 20% 20%, rgba(15, 90, 92, 0.28), transparent 26%),
+            radial-gradient(circle at 80% 10%, rgba(12, 64, 78, 0.38), transparent 22%),
+            radial-gradient(110% 120% at 50% 0%, rgba(4, 18, 24, 0.9), rgba(4, 12, 18, 0.95)),
+            linear-gradient(135deg, #031219 0%, #071f2a 60%, #031017 100%)`,
+          backgroundColor: '#041218'
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200"
+          className="w-full max-w-xl bg-[#041218cc] backdrop-blur-xl border border-white/5 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)] rounded-[28px] overflow-hidden"
         >
-          <div className="flex flex-col items-center mb-8">
-            <div className="bg-blue-900 p-4 rounded-full mb-4">
-              <School className="w-10 h-10 text-white" />
+          <div className="flex flex-col items-center gap-3 px-10 pt-10 pb-6 text-center">
+            <img src={logo} alt="Escuela Maradona Menotti" className="h-24 w-auto object-contain drop-shadow-[0_16px_34px_rgba(0,45,43,0.45)]" />
+            <div className="px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-white bg-[#00968f]/70 border border-[#0ffff4]/50 rounded-full shadow-sm drop-shadow">
+              Acceso seguro
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 text-center">ESCUELA MARADONA MENOTTI</h1>
-            <p className="text-slate-500 text-sm">Sistema de Gestión de Analíticos</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email Institucional</label>
+          <form onSubmit={handleLogin} className="space-y-4 px-10 pb-10 text-white">
+            <div className="space-y-1">
+              <label className="block text-sm font-semibold text-white/90">Email Institucional</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-[#0ffff4]/20 bg-white/88 text-slate-800 placeholder:text-slate-500 focus:ring-2 focus:ring-[#00968f] focus:border-transparent outline-none transition-all shadow-[0_10px_35px_-30px_rgba(0,0,0,0.35)]"
                 placeholder="ej: titulos@maradonamenotti.com.ar"
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Contrasena</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none transition-all"
-                placeholder="Ingresa tu contrasena"
-                required
-              />
+            <div className="space-y-1">
+              <label className="block text-sm font-semibold text-white/90">Contraseña</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-[#0ffff4]/20 bg-white/88 text-slate-800 placeholder:text-slate-500 focus:ring-2 focus:ring-[#00968f] focus:border-transparent outline-none transition-all shadow-[0_10px_35px_-30px_rgba(0,0,0,0.35)]"
+                  placeholder="Ingresa tu contraseña"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-3 my-1 px-3 text-xs font-bold text-[#002d2b] bg-[#0ffff4]/30 hover:bg-[#0ffff4]/50 rounded-lg transition-colors"
+                >
+                  {showPassword ? 'Ocultar' : 'Mostrar'}
+                </button>
+              </div>
             </div>
-            {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+            {error && <p className="text-red-500 text-xs mt-1 font-semibold">{error}</p>}
             <button
               type="submit"
               disabled={backendStatus === 'checking'}
-              className="w-full bg-blue-900 hover:bg-blue-800 disabled:bg-slate-400 text-white font-semibold py-3 rounded-lg transition-colors shadow-lg"
+              className="w-full bg-gradient-to-r from-[#0ffff4] to-[#00968f] disabled:from-slate-400 disabled:to-slate-500 text-[#002d2b] font-extrabold py-3.5 rounded-xl transition-all shadow-[0_16px_50px_-22px_rgba(0,255,244,0.35)] hover:-translate-y-0.5 active:scale-[0.98]"
             >
               {backendStatus === 'checking' ? 'Iniciando...' : 'Ingresar al Sistema'}
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-400">Acceso restringido a personal autorizado y alumnos matriculados.</p>
+          <div className="px-10 pb-10">
+            <div className="rounded-2xl bg-[#0ffff4]/12 border border-[#0ffff4]/30 px-4 py-3 text-center">
+              <p className="text-xs text-white/90 font-medium">Acceso restringido a personal autorizado y alumnos matriculados.</p>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -772,13 +814,42 @@ function AppContent() {
       return acc;
     }, {} as Record<string, number>);
 
+    // Emitidos por licencia
+    const emitidosPorLicencia = students
+      .filter(s => s.estado_analitico === 'emitido')
+      .reduce((acc, curr) => {
+        const c = curr.licencia || 'Sin licencia';
+        acc[c] = (acc[c] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+    // Analíticos completos por licencia
+    const completosPorLicencia = students
+      .filter(s => isAnaliticoCompleto(s))
+      .reduce((acc, curr) => {
+        const c = curr.licencia || 'Sin licencia';
+        acc[c] = (acc[c] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+    // Últimos 5 días emitidos
+    const today = new Date();
+    const recentEmitidos = students
+      .filter(s => s.estado_analitico === 'emitido' && s.fecha_emision)
+      .filter(s => {
+        const f = new Date(s.fecha_emision as string);
+        const diff = (today.getTime() - f.getTime()) / (1000 * 60 * 60 * 24);
+        return diff <= 5;
+      })
+      .sort((a, b) => new Date(b.fecha_emision || '').getTime() - new Date(a.fecha_emision || '').getTime());
+
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h2 className="text-3xl font-bold text-slate-900 drop-shadow-sm">Dashboard General</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
             <h3 className="text-slate-500 text-sm font-medium mb-3 uppercase tracking-wider">Total Alumnos</h3>
-            <p className="text-4xl font-extrabold text-blue-900">{totalAlumnos}</p>
+            <p className="text-4xl font-extrabold text-[#002d2b]">{totalAlumnos}</p>
           </div>
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
             <h3 className="text-emerald-700 text-sm font-medium mb-3 uppercase tracking-wider">Con Analítico</h3>
@@ -795,12 +866,62 @@ function AppContent() {
             {Object.entries(porCarrera).map(([carr, count]) => (
               <div key={carr} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <span className="font-semibold text-slate-700 line-clamp-1" title={carr}>{carr}</span>
-                <span className="bg-blue-100 text-blue-900 px-4 py-1.5 rounded-full text-sm font-black shadow-inner">{count}</span>
+                <span className="bg-[#0ffff4]/25 text-[#002d2b] px-4 py-1.5 rounded-full text-sm font-black shadow-inner border border-[#0ffff4]/50">{count}</span>
               </div>
             ))}
             {Object.keys(porCarrera).length === 0 && (
               <p className="text-slate-500 italic">Cargue el padron QUINTTOS para ver estadisticas.</p>
             )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Emitidos por Licencia</h3>
+            <div className="space-y-3">
+              {Object.entries(emitidosPorLicencia).map(([lic, count]) => (
+                <div key={lic} className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-100 bg-slate-50/60">
+                  <span className="font-semibold text-slate-700">{lic}</span>
+                  <span className="text-sm font-black text-[#002d2b] bg-[#0ffff4]/20 border border-[#0ffff4]/40 rounded-full px-3 py-1">{count}</span>
+                </div>
+              ))}
+              {Object.keys(emitidosPorLicencia).length === 0 && (
+                <p className="text-slate-500 text-sm">Aún no hay analíticos emitidos.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Emitidos últimos 5 días</h3>
+            <div className="space-y-3">
+              {recentEmitidos.slice(0, 8).map((s, idx) => (
+                <div key={`${s.id}-${idx}`} className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-100 bg-[#0ffff4]/10">
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">{s.nombre}</p>
+                    <p className="text-xs text-slate-500">Licencia {s.licencia || 'S/LI'} · ID {s.dni}</p>
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-[#00968f]">{s.fecha_emision}</span>
+                </div>
+              ))}
+              {recentEmitidos.length === 0 && (
+                <p className="text-slate-500 text-sm">Sin emisiones en los últimos 5 días.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Analíticos completos por Licencia</h3>
+            <div className="space-y-3">
+              {Object.entries(completosPorLicencia).map(([lic, count]) => (
+                <div key={lic} className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-100 bg-slate-50/60">
+                  <span className="font-semibold text-slate-700">{lic}</span>
+                  <span className="text-sm font-black text-[#00968f] bg-[#0ffff4]/15 border border-[#0ffff4]/40 rounded-full px-3 py-1">{count}</span>
+                </div>
+              ))}
+              {Object.keys(completosPorLicencia).length === 0 && (
+                <p className="text-slate-500 text-sm">Sin analíticos completos aún.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -837,7 +958,7 @@ function AppContent() {
                 <span>Eliminar {selectedStudents.length}</span>
               </button>
             )}
-            <label className={`flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl cursor-pointer transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <label className={`flex items-center gap-2 px-4 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white font-medium rounded-xl cursor-pointer transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <Upload className="w-4 h-4" />
               <span>Sincronizar QUINTTOS</span>
               <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQuinttosUpload} disabled={isUploading} />
@@ -864,11 +985,11 @@ function AppContent() {
             <form onSubmit={handleModalSubmit} className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Archivo de Notas Excel (.xlsx)</label>
-                <input required type="file" accept=".xlsx, .xls" name="excelFile" className="w-full border border-slate-200 rounded-xl p-2 focus:ring-2 outline-none focus:ring-blue-100" />
+                <input required type="file" accept=".xlsx, .xls" name="excelFile" className="w-full border border-slate-200 rounded-xl p-2 focus:ring-2 outline-none focus:ring-[#0ffff4]/50" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Licencia Correspondiente</label>
-                <select required name="licencia" className="w-full border border-slate-200 rounded-xl p-2.5 bg-white focus:ring-2 outline-none focus:ring-blue-100">
+                <select required name="licencia" className="w-full border border-slate-200 rounded-xl p-2.5 bg-white focus:ring-2 outline-none focus:ring-[#0ffff4]/50">
                   <option value="CB">Licencia CB</option>
                   <option value="A">Licencia A</option>
                   <option value="B">Licencia B</option>
@@ -887,7 +1008,7 @@ function AppContent() {
               </div>
               <div className="pt-5 border-t border-slate-100 flex gap-3">
                 <button type="button" onClick={() => setImportConfig({ isOpen: false, mode: null })} className="flex-1 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
-                <button type="submit" disabled={isUploading} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow shadow-blue-200">
+                <button type="submit" disabled={isUploading} className="flex-1 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-bold transition-all shadow shadow-[#002d2b]/30 hover:-translate-y-0.5 active:scale-[0.98]">
                   {isUploading ? 'Procesando...' : (importConfig.mode === 'db' ? 'Subir Notas' : 'Crear ZIP')}
                 </button>
               </div>
@@ -896,31 +1017,51 @@ function AppContent() {
         </div>
       )}
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row gap-4 mb-2">
-          <div className="relative shadow-sm rounded-xl flex-1">
+        <div className="flex flex-col lg:flex-row gap-3 mb-2">
+          <div className="relative shadow-sm rounded-xl flex-1 min-w-[220px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Buscar por nombre o DNI..."
+              placeholder="Buscar por nombre o ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900 outline-none transition-all bg-white font-medium"
+              className="w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium"
             />
           </div>
-          <div className="flex gap-3 shrink-0 overflow-x-auto pb-1 md:pb-0">
+          <div className="flex flex-wrap gap-2 items-center">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full md:w-auto md:min-w-[180px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900 outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+              className="min-w-[170px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
             >
               <option value="all">Todas las situaciones</option>
               {uniqueStatuses.map(st => (
                 <option key={st as string} value={st as string}>{st as string}</option>
               ))}
             </select>
+            <select
+              value={licenciaFilter}
+              onChange={(e) => setLicenciaFilter(e.target.value)}
+              className="min-w-[150px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value="all">Todas las licencias</option>
+              {uniqueLicencias.map(l => (
+                <option key={l as string} value={l as string}>{l as string}</option>
+              ))}
+            </select>
+            <select
+              value={comisionFilter}
+              onChange={(e) => setComisionFilter(e.target.value)}
+              className="min-w-[150px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value="all">Todas las comisiones</option>
+              {uniqueComisiones.map(c => (
+                <option key={c as string} value={c as string}>{c as string}</option>
+              ))}
+            </select>
             <button
               onClick={exportToExcel}
-              className="flex items-center gap-2 h-full min-h-[56px] px-5 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold transition-all shadow-sm shrink-0 whitespace-nowrap"
+              className="flex items-center gap-2 h-full min-h-[56px] px-5 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-bold transition-all shadow-sm shrink-0 whitespace-nowrap hover:-translate-y-0.5 active:scale-[0.98]"
               title="Exportar listado actual a Excel"
             >
               <FileSpreadsheet className="w-5 h-5" />
@@ -935,7 +1076,7 @@ function AppContent() {
             <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 mb-2">
               <input 
                 type="checkbox" 
-                className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer"
+                className="w-5 h-5 rounded border-slate-300 text-[#002d2b] focus:ring-[#00968f] cursor-pointer"
                 checked={filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).every(s => s.id && selectedStudents.includes(s.id))}
                 onChange={toggleSelectAll}
               />
@@ -950,39 +1091,39 @@ function AppContent() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  onClick={() => setSelectedStudent(student)}
+                  onClick={() => { setSelectedStudent(student); if (student.id) loadStudentDetail(student.id); }}
                   className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group ${
                     selectedStudents.includes(student.id || '') 
-                      ? 'bg-blue-50 border-blue-400 shadow-md ring-1 ring-blue-400' 
+                      ? 'bg-[#0ffff4]/15 border-[#00968f] shadow-md ring-1 ring-[#00968f]' 
                       : student.situacion === 'DUPLICADO'
                         ? 'bg-rose-50 border-rose-300 hover:border-rose-400 hover:shadow-md'
-                        : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300'
+                        : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-[#00968f33]'
                   }`}
                 >
                   {/* Left: Checkbox, Icon, Details */}
                   <div className="flex items-center gap-4">
                     <input 
                       type="checkbox" 
-                      className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer"
+                      className="w-5 h-5 rounded border-slate-300 text-[#002d2b] focus:ring-[#00968f] cursor-pointer"
                       checked={selectedStudents.includes(student.id || '')}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => toggleSelectStudent(student.id || '')}
                     />
                     <div className={`p-3 rounded-xl hidden sm:flex shrink-0 transition-colors ${
                       selectedStudents.includes(student.id || '')
-                        ? 'bg-blue-200 text-blue-900'
+                        ? 'bg-[#0ffff4]/30 text-[#002d2b]'
                         : student.situacion === 'DUPLICADO' 
                           ? 'bg-rose-100 group-hover:bg-rose-200' 
-                          : 'bg-blue-50 group-hover:bg-blue-100'
+                          : 'bg-[#0ffff4]/10 group-hover:bg-[#0ffff4]/20'
                     }`}>
-                      <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : 'text-blue-900'}`} />
+                      <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : 'text-[#002d2b]'}`} />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-slate-900 mb-0.5 line-clamp-1">
                         {student.nombre} {student.apellido && student.apellido !== 'Sin Apellido' && !student.nombre.includes(student.apellido) ? student.apellido : ''} {student.situacion === 'DUPLICADO' && <span className="text-rose-600 text-sm ml-2">(DUPLICADO)</span>}
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs font-semibold mt-1">
-                        <span className="flex items-center gap-1 text-slate-500">DNI: {student.dni}</span>
+                        <span className="flex items-center gap-1 text-slate-500">ID: {student.dni}</span>
                         <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="flex items-center gap-1 text-slate-500">MATRÍCULA: {student.dni}</span>
                         <span className="hidden sm:inline text-slate-300">⬢</span>
@@ -990,7 +1131,7 @@ function AppContent() {
                           LICENCIA {student.licencia || 'S/LI'}
                         </span>
                         <span className="hidden sm:inline text-slate-300">⬢</span>
-                        <span className="text-blue-800 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider border border-blue-100">
+                        <span className="text-[#002d2b] bg-[#0ffff4]/15 px-2 py-0.5 rounded uppercase tracking-wider border border-[#0ffff4]/40">
                           COMISIÓN {student.comision || '-'}
                         </span>
                       </div>
@@ -998,7 +1139,7 @@ function AppContent() {
                   </div>
 
                   <div className="flex items-center justify-between w-full md:w-auto gap-4 border-t md:border-0 pt-3 md:pt-0 border-slate-100">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${student.estado_analitico === 'emitido' ? 'bg-blue-900 text-white border-blue-900' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${student.estado_analitico === 'emitido' ? 'bg-[#00968f] text-white border-[#00968f]' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                       {student.estado_analitico === 'emitido' ? 'Emitido' : 'Borrador'}
                     </span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${isAnaliticoCompleto(student) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
@@ -1022,7 +1163,7 @@ function AppContent() {
                       {student.notas && student.notas.length > 0 && (
                         <button
                           onClick={() => downloadPDF(student)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 hover:text-blue-800 rounded-lg transition-colors"
+                          className="p-2 text-[#00968f] hover:bg-[#0ffff4]/15 hover:text-[#002d2b] rounded-lg transition-colors"
                           title="Descargar Analítico"
                         >
                           <Download className="w-5 h-5" />
@@ -1056,7 +1197,7 @@ function AppContent() {
                 <select
                   value={itemsPerPage}
                   onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-900 outline-none cursor-pointer"
+                  className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#00968f] outline-none cursor-pointer"
                 >
                   <option value={25}>25</option>
                   <option value={50}>50</option>
@@ -1074,7 +1215,7 @@ function AppContent() {
                 >
                   Anterior
                 </button>
-                <div className="px-4 py-2 bg-blue-50 text-blue-800 rounded-lg font-black text-sm border border-blue-100/50">
+                <div className="px-4 py-2 bg-[#0ffff4]/15 text-[#002d2b] rounded-lg font-black text-sm border border-[#0ffff4]/40">
                   {currentPage} de {Math.max(1, Math.ceil(filteredStudents.length / itemsPerPage))}
                 </div>
                 <button
@@ -1179,9 +1320,9 @@ function AppContent() {
                         {(user?.role === 'admin' || user?.role === 'editor') && (
                           <button
                             onClick={startEditDatos}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-bold border border-blue-200 bg-blue-50 px-2 py-0.5 rounded transition-colors"
+                            className="text-[#00968f] hover:text-[#002d2b] text-xs font-bold border border-[#0ffff4]/40 bg-[#0ffff4]/15 px-2 py-0.5 rounded transition-colors"
                           >
-                            ✏️ Editar Datos
+                            Editar Datos
                           </button>
                         )}
                       </div>
@@ -1191,11 +1332,11 @@ function AppContent() {
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Editando Datos Personales</p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-xs text-slate-500 mb-1">ID / DNI</label>
+                          <label className="block text-xs text-slate-500 mb-1">ID</label>
                           <input
                             value={editDni}
                             onChange={e => setEditDni(e.target.value)}
-                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
                             placeholder="Nro. documento"
                           />
                         </div>
@@ -1204,7 +1345,7 @@ function AppContent() {
                           <input
                             value={editNombre}
                             onChange={e => setEditNombre(e.target.value)}
-                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
                             placeholder="Nombre(s)"
                           />
                         </div>
@@ -1213,7 +1354,7 @@ function AppContent() {
                           <input
                             value={editApellido}
                             onChange={e => setEditApellido(e.target.value)}
-                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
                             placeholder="Apellido"
                           />
                         </div>
@@ -1222,13 +1363,13 @@ function AppContent() {
                           <input
                             value={editNacionalidad}
                             onChange={e => setEditNacionalidad(e.target.value)}
-                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
                             placeholder="Ej: Argentina"
                           />
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={saveDatos} className="bg-blue-900 hover:bg-blue-950 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-colors">Guardar</button>
+                        <button onClick={saveDatos} className="bg-[#002d2b] hover:bg-[#00968f] text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-colors">Guardar</button>
                         <button onClick={() => setEditingDatos(false)} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-1.5 rounded-lg text-sm font-bold transition-colors">Cancelar</button>
                       </div>
                     </div>
@@ -1254,8 +1395,8 @@ function AppContent() {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="bg-blue-50 p-4 border border-blue-100 rounded-2xl">
-                    <p className="text-[11px] font-black text-blue-500 uppercase tracking-widest">Licencia / Carrera</p>
+                  <div className="bg-[#0ffff4]/12 p-4 border border-[#0ffff4]/35 rounded-2xl">
+                    <p className="text-[11px] font-black text-[#00968f] uppercase tracking-widest">Licencia / Carrera</p>
                     <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.licencia || 'NO ASIGNADA'}</p>
                   </div>
                   <div className="bg-emerald-50 p-4 border border-emerald-100 rounded-2xl">
@@ -1284,7 +1425,7 @@ function AppContent() {
                   {(user?.role === 'admin' || user?.role === 'editor') && (
                     <button
                       onClick={() => setShowAddNota(prev => !prev)}
-                      className="text-xs font-bold bg-blue-900 hover:bg-blue-950 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      className="text-xs font-bold bg-[#002d2b] hover:bg-[#00968f] text-white px-3 py-1.5 rounded-lg transition-colors"
                     >
                       + Agregar Nota
                     </button>
@@ -1292,15 +1433,15 @@ function AppContent() {
                 </div>
 
                 {showAddNota && (
-                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
-                    <p className="text-xs font-bold text-blue-700 uppercase tracking-widest">Nueva Materia / Nota</p>
+                  <div className="mb-4 p-4 bg-[#0ffff4]/12 border border-[#0ffff4]/35 rounded-xl space-y-3">
+                    <p className="text-xs font-bold text-[#00968f] uppercase tracking-widest">Nueva Materia / Nota</p>
                     <div className="flex gap-2 items-end">
                       <div className="flex-1">
                         <label className="block text-xs text-slate-500 mb-1">Materia</label>
                         <input
                           value={newMateria}
                           onChange={e => setNewMateria(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
                           placeholder="Ej: TÉCNICA TÁCTICA I"
                         />
                       </div>
@@ -1313,11 +1454,11 @@ function AppContent() {
                           max="10"
                           value={newNota}
                           onChange={e => setNewNota(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
                           placeholder="8.5"
                         />
                       </div>
-                      <button onClick={saveNotaManual} className="bg-blue-900 hover:bg-blue-950 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shrink-0">
+                      <button onClick={saveNotaManual} className="bg-[#002d2b] hover:bg-[#00968f] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shrink-0">
                         Guardar
                       </button>
                     </div>
@@ -1388,21 +1529,21 @@ function AppContent() {
                                     value={pending !== undefined ? pending : (notaActual || '')}
                                     onChange={e => setPendingNotas(prev => ({ ...prev, [materia]: e.target.value }))}
                                     onKeyDown={e => { if (e.key === 'Enter') guardarNota(materia, pending ?? String(notaActual)); }}
-                                    className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-blue-900 transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : tiene ? 'bg-blue-50 text-blue-900 border-blue-200' : 'bg-red-50 text-red-500 border-red-200'}`}
+                                    className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-[#00968f] transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : tiene ? 'bg-[#0ffff4]/15 text-[#002d2b] border-[#0ffff4]/40' : 'bg-red-50 text-red-500 border-red-200'}`}
                                     placeholder="0"
                                   />
                                   {hasPending && (
                                     <button
                                       onClick={() => guardarNota(materia, pending!)}
                                       disabled={isSaving}
-                                      className="text-xs bg-blue-900 hover:bg-blue-950 text-white px-2 py-1 rounded-lg font-bold transition-colors disabled:opacity-50"
+                                      className="text-xs bg-[#002d2b] hover:bg-[#00968f] text-white px-2 py-1 rounded-lg font-bold transition-colors disabled:opacity-50"
                                     >
                                       {isSaving ? '...' : 'OK'}
                                     </button>
                                   )}
                                 </>
                               ) : (
-                                <span className={`w-10 text-center py-1 rounded font-black text-sm ${tiene ? 'bg-blue-100 text-blue-900' : 'bg-red-50 text-red-400'}`}>{notaActual || '-'}</span>
+                                <span className={`w-10 text-center py-1 rounded font-black text-sm ${tiene ? 'bg-[#0ffff4]/20 text-[#002d2b]' : 'bg-red-50 text-red-400'}`}>{notaActual || '-'}</span>
                               )}
                             </div>
                           </div>
@@ -1416,7 +1557,7 @@ function AppContent() {
                         {selectedStudent.notas.map((nota, i) => (
                           <div key={i} className="flex justify-between items-center p-3.5 bg-white border-b border-slate-50 hover:bg-slate-50 transition-colors last:border-0">
                             <span className="font-semibold text-slate-700 text-sm">{nota.materia}</span>
-                            <span className="bg-blue-100 text-blue-900 w-10 text-center py-1 rounded font-black">{nota.nota}</span>
+                            <span className="bg-[#0ffff4]/20 text-[#002d2b] w-10 text-center py-1 rounded font-black">{nota.nota}</span>
                           </div>
                         ))}
                       </div>
@@ -1439,7 +1580,7 @@ function AppContent() {
                         type="date"
                         value={selectedStudent.fecha_fin_cursada || ''}
                         onChange={(e) => setSelectedStudent({ ...selectedStudent, fecha_fin_cursada: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-900 outline-none transition-all"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#00968f] outline-none transition-all"
                       />
                     </div>
                     <div>
@@ -1448,7 +1589,7 @@ function AppContent() {
                         type="date"
                         value={selectedStudent.fecha_emision || ''}
                         onChange={(e) => setSelectedStudent({ ...selectedStudent, fecha_emision: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-900 outline-none transition-all"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#00968f] outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -1529,7 +1670,7 @@ function AppContent() {
                           <button
                             onClick={() => !disabled && downloadPDF(selectedStudent)}
                             disabled={disabled}
-                            className={`px-5 py-2.5 rounded-xl font-bold flex gap-2 items-center transition-all border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900${disabledClasses}`}
+                            className={`px-5 py-2.5 rounded-xl font-bold flex gap-2 items-center transition-all border border-[#0ffff4]/40 bg-[#0ffff4]/10 hover:bg-[#0ffff4]/20 text-[#002d2b]${disabledClasses}`}
                             title="Abre el PDF para verlo, sin marcarlo como Emitido"
                           >
                             <Download className="w-4 h-4" /> Vista Previa
@@ -1545,7 +1686,7 @@ function AppContent() {
                           <button
                             onClick={() => !disabled && downloadPDFAndEmit(selectedStudent)}
                             disabled={disabled}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 bg-blue-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200${disabledClasses}`}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-bold transition-all shadow-lg shadow-[#002d2b]/25${disabledClasses}`}
                             title="Genera el PDF y marca el analítico como Emitido"
                           >
                             <Download className="w-5 h-5" />
@@ -1577,7 +1718,7 @@ function AppContent() {
             <input
               value={newUserNombre}
               onChange={e => setNewUserNombre(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
               placeholder="Ej: Maria Gonzalez"
             />
           </div>
@@ -1587,7 +1728,7 @@ function AppContent() {
               type="email"
               value={newUserEmail}
               onChange={e => setNewUserEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
               placeholder="editor@ejemplo.com"
             />
           </div>
@@ -1597,7 +1738,7 @@ function AppContent() {
               type="text"
               value={newUserPassword}
               onChange={e => setNewUserPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none"
               placeholder="Contrasena temporal"
             />
           </div>
@@ -1606,7 +1747,7 @@ function AppContent() {
             <select
               value={newUserRole}
               onChange={e => setNewUserRole(e.target.value as 'editor' | 'viewer')}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none bg-white"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none bg-white"
             >
               <option value="editor">Editor (puede editar)</option>
               <option value="viewer">Viewer (solo lectura)</option>
@@ -1616,12 +1757,12 @@ function AppContent() {
         <div className="mt-4 flex justify-end">
           <button
             onClick={handleCreateUser}
-            className="bg-blue-900 hover:bg-blue-950 text-white px-6 py-2 rounded-lg text-sm font-bold transition-colors shadow"
+            className="bg-[#002d2b] hover:bg-[#00968f] text-white px-6 py-2 rounded-lg text-sm font-bold transition-all shadow hover:-translate-y-0.5 active:scale-[0.98]"
           >
             Crear Usuario
           </button>
         </div>
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+        <div className="mt-4 p-3 bg-[#0ffff4]/15 border border-[#0ffff4]/40 rounded-xl text-xs text-[#004742]">
           <strong>Permisos Editor:</strong> Ver/editar alumnos, cargar notas y fechas. <strong>Permisos Viewer:</strong> Solo lectura (sin generar/emitir).
         </div>
       </div>
@@ -1640,8 +1781,8 @@ function AppContent() {
             {appUsers.map(u => (
               <div key={u.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-xl ${u.role === 'admin' ? 'bg-blue-100' : 'bg-emerald-100'}`}>
-                    <User className={`w-5 h-5 ${u.role === 'admin' ? 'text-blue-700' : 'text-emerald-700'}`} />
+                  <div className={`p-2 rounded-xl ${u.role === 'admin' ? 'bg-[#0ffff4]/20' : 'bg-emerald-100'}`}>
+                    <User className={`w-5 h-5 ${u.role === 'admin' ? 'text-[#002d2b]' : 'text-emerald-700'}`} />
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900">{u.nombre}</p>
@@ -1649,7 +1790,7 @@ function AppContent() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${u.role === 'admin' ? 'bg-blue-100 text-blue-900' : 'bg-emerald-100 text-emerald-700'}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${u.role === 'admin' ? 'bg-[#0ffff4]/20 text-[#002d2b]' : 'bg-emerald-100 text-emerald-700'}`}>
                     {u.role}
                   </span>
                   {u.role !== 'admin' && (
@@ -1671,56 +1812,55 @@ function AppContent() {
   );
 
   return (
-    <div className="h-screen bg-slate-50 font-sans flex overflow-hidden">
+    <div className="h-screen font-sans flex overflow-hidden text-slate-900">
       {/* SIDEBAR */}
-      <aside className="w-72 bg-blue-950 flex flex-col shadow-2xl relative z-20 shrink-0">
-        <div className="p-6 flex items-center gap-3 text-white border-b border-blue-900/50">
-          <School className="w-9 h-9 text-blue-400 drop-shadow-md" />
-          <span className="font-extrabold text-xl tracking-tight drop-shadow-sm">MARADONA MENOTTI</span>
+      <aside className="w-72 bg-[#002d2b] flex flex-col shadow-2xl relative z-20 shrink-0 text-white">
+        <div className="p-6 flex items-center border-b border-white/10">
+          <img src={logo} alt="Escuela Maradona Menotti" className="h-10 w-auto object-contain" />
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-3">
           {user.role === 'admin' && (
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-blue-800 text-white font-bold shadow-inner border border-blue-700/50' : 'text-blue-200/80 hover:bg-blue-900 hover:text-white font-medium'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-white/10 text-white font-bold shadow-inner border border-[#0ffff4]/30' : 'text-white/70 hover:bg-white/5 hover:text-white font-medium'}`}
             >
-              <LayoutDashboard className={`w-5 h-5 ${activeTab === 'dashboard' ? 'text-blue-300' : ''}`} />
+              <LayoutDashboard className="w-5 h-5" />
               Dashboard
             </button>
           )}
           <button
             onClick={() => setActiveTab('alumnos')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-blue-800 text-white font-bold shadow-inner border border-blue-700/50' : 'text-blue-200/80 hover:bg-blue-900 hover:text-white font-medium'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-white/10 text-white font-bold shadow-inner border border-[#0ffff4]/30' : 'text-white/70 hover:bg-white/5 hover:text-white font-medium'}`}
           >
-            <Users className={`w-5 h-5 ${activeTab === 'alumnos' ? 'text-blue-300' : ''}`} />
+            <Users className="w-5 h-5" />
             Padron de Alumnos
           </button>
           {user.role === 'admin' && (
             <button
               onClick={() => { setActiveTab('usuarios'); fetchAppUsers(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'usuarios' ? 'bg-blue-800 text-white font-bold shadow-inner border border-blue-700/50' : 'text-blue-200/80 hover:bg-blue-900 hover:text-white font-medium'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${activeTab === 'usuarios' ? 'bg-white/10 text-white font-bold shadow-inner border border-[#0ffff4]/30' : 'text-white/70 hover:bg-white/5 hover:text-white font-medium'}`}
             >
-              <User className={`w-5 h-5 ${activeTab === 'usuarios' ? 'text-blue-300' : ''}`} />
+              <User className="w-5 h-5" />
               Usuarios
             </button>
           )}
         </nav>
 
-        <div className="p-5 bg-blue-900/50 mt-auto border-t border-blue-900">
+        <div className="p-5 bg-white/5 mt-auto border-t border-white/10">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3 px-2">
-              <div className="bg-blue-800 p-2.5 rounded-xl shadow-sm">
-                <User className="w-5 h-5 text-blue-300" />
+              <div className="bg-white/10 p-2.5 rounded-xl shadow-sm ring-2 ring-[#0ffff4]/25">
+                <User className="w-5 h-5 text-[#0ffff4]" />
               </div>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm font-semibold text-white truncate" title={user.name}>{user.name}</span>
-                <span className="text-[11px] font-black uppercase text-blue-400 tracking-wider mt-0.5">{user.role}</span>
+                <span className="text-[11px] font-black uppercase text-[#0ffff4] tracking-wider mt-0.5">{user.role}</span>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center justify-center gap-2 w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl transition-all border border-red-500/20"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl transition-all border border-white/15"
             >
               <LogOut className="w-4 h-4" />
               <span className="text-sm font-bold">Cerrar Sesión</span>
@@ -1730,9 +1870,9 @@ function AppContent() {
       </aside>
 
       {/* MAIN CONTENT HEADER + SCROLLABLE AREA */}
-      <div className="flex-1 flex flex-col h-full bg-slate-50 min-w-0">
-        <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center sticky top-0 z-10 shadow-sm">
-          <h1 className="text-slate-800 text-2xl font-black tracking-tight">
+      <div className="flex-1 flex flex-col h-full bg-transparent min-w-0">
+        <header className="h-20 bg-white/90 backdrop-blur-xl border-b border-[#00968f26] px-8 flex items-center sticky top-0 z-10 shadow-sm">
+          <h1 className="text-[#002d2b] text-2xl font-black tracking-tight">
             {activeTab === 'dashboard' ? 'Panel de Control' : activeTab === 'usuarios' ? 'Gestión de Usuarios' : 'Base de Datos de Alumnos'}
           </h1>
         </header>
@@ -1757,8 +1897,8 @@ function AppContent() {
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 flex flex-col"
             >
-              <div className={`p-5 flex items-start gap-4 border-b border-slate-100 ${confirmModal.type === 'danger' ? 'bg-red-50' : confirmModal.type === 'warning' ? 'bg-amber-50' : 'bg-blue-50'}`}>
-                <div className={`shrink-0 p-3 rounded-xl ${confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' : confirmModal.type === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+              <div className={`p-5 flex items-start gap-4 border-b border-slate-100 ${confirmModal.type === 'danger' ? 'bg-red-50' : confirmModal.type === 'warning' ? 'bg-amber-50' : 'bg-[#0ffff4]/10'}`}>
+                <div className={`shrink-0 p-3 rounded-xl ${confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' : confirmModal.type === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-[#00968f]/10 text-[#00968f]'}`}>
                   {confirmModal.type === 'danger' ? <Trash2 className="w-6 h-6" /> : confirmModal.type === 'warning' ? <AlertTriangle className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
                 </div>
                 <div>
@@ -1775,7 +1915,7 @@ function AppContent() {
                     value={confirmInput}
                     onChange={(e) => setConfirmInput(e.target.value)}
                     placeholder={confirmModal.inputPlaceholder}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-900 outline-none transition-all shadow-sm"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#00968f] outline-none transition-all shadow-sm"
                     autoFocus
                   />
                 </div>
@@ -1796,7 +1936,7 @@ function AppContent() {
                     }
                     confirmModal.onConfirm(confirmInput);
                   }}
-                  className={`px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-colors shadow-sm ${confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : confirmModal.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  className={`px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-colors shadow-sm ${confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : confirmModal.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-[#002d2b] hover:bg-[#00968f]'}`}
                 >
                   Confirmar
                 </button>
