@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import {
@@ -55,10 +55,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
       return (
         <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
           <div className="bg-white p-8 rounded-xl shadow-lg border border-red-200 text-center">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Algo saliÃ³ mal</h1>
-            <p className="text-slate-600 mb-6">Hubo un error al cargar la aplicaciÃ³n.</p>
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Algo salió mal</h1>
+            <p className="text-slate-600 mb-6">Hubo un error al cargar la aplicación.</p>
             <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2 rounded-lg">
-              Recargar pÃ¡gina
+              Recargar página
             </button>
           </div>
         </div>
@@ -85,14 +85,14 @@ function AppContent() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'ok' | 'error'>('checking');
   const [importConfig, setImportConfig] = useState<{ isOpen: boolean; mode: 'db' | 'zip' | null }>({ isOpen: false, mode: null });
   const [diplomaModal, setDiplomaModal] = useState<{isOpen: boolean, student: StudentData | null}>({ isOpen: false, student: null });
-  // GestiÃ³n de usuarios
+  // Gestión de usuarios
   const [appUsers, setAppUsers] = useState<any[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserNombre, setNewUserNombre] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'editor' | 'viewer'>('editor');
 
-  // Modal de confirmaciÃ³n personalizado
+  // Modal de confirmación personalizado
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (val: string) => void; type?: 'danger' | 'warning' | 'info'; withInput?: boolean; inputLabel?: string; inputPlaceholder?: string }>({ open: false, title: '', message: '', onConfirm: () => { } });
   const [confirmInput, setConfirmInput] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
@@ -177,14 +177,14 @@ function AppContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Credenciales invÃ¡lidas');
+        setError(data.error || 'Credenciales inválidas');
         return;
       }
       setUser({ email: data.email, role: data.role, name: data.nombre });
       if (data.role !== 'admin') setActiveTab('alumnos');
       setError('');
     } catch (err) {
-      setError('Error de conexiÃ³n con el servidor');
+      setError('Error de conexión con el servidor');
     }
   };
 
@@ -272,18 +272,18 @@ function AppContent() {
         const res = await fetch(`${API_URL}/api/generate-certificates`, { method: 'POST', body: submitData });
         if (!res.ok) {
           const err = await res.json();
-          throw new Error(err.error || 'Error en generaciÃ³n de PDFs masiva');
+          throw new Error(err.error || 'Error en generación de PDFs masiva');
         }
         const data = await res.json();
         if (data.success && data.downloadUrl) {
           window.location.href = `${API_URL}${data.downloadUrl}`;
-          setTimeout(() => toast.success('Certificados generados. La descarga comenzarÃ¡ enseguida.'), 500);
-        } else throw new Error('No se recibiÃ³ la URL de descarga.');
+          setTimeout(() => toast.success('Certificados generados. La descarga comenzará enseguida.'), 500);
+        } else throw new Error('No se recibió la URL de descarga.');
       }
       setImportConfig({ isOpen: false, mode: null });
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Error de conexiÃ³n al procesar');
+      toast.error(err.message || 'Error de conexión al procesar');
     } finally {
       setIsUploading(false);
     }
@@ -308,11 +308,11 @@ function AppContent() {
         toast.success(result.message);
         await fetchStudents();
       } else {
-        toast.error(result.error || 'Error al procesar padrónn QUINTTOS');
+        toast.error(result.error || 'Error al procesar padrón QUINTTOS');
       }
     } catch (err) {
       console.error(err);
-      alert('Error de conexiÃ³n con el servidor');
+      alert('Error de conexión con el servidor');
     } finally {
       setIsUploading(false);
     }
@@ -323,7 +323,7 @@ function AppContent() {
     setConfirmModal({
       open: true,
       title: 'Eliminar Alumno',
-      message: 'Â¿EstÃ¡s seguro de que deseas eliminar este registro? Esta acciÃ³n no se puede deshacer.',
+      message: '¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.',
       type: 'danger',
       onConfirm: async (_val: string) => {
         try {
@@ -343,7 +343,7 @@ function AppContent() {
     setConfirmModal({
       open: true,
       title: 'Eliminar Notas',
-      message: 'Â¿EstÃ¡s seguro de que deseas eliminar las notas de este alumno? VolverÃ¡ a borrador.',
+      message: '¿Estás seguro de que deseas eliminar las notas de este alumno? Volverá a borrador.',
       type: 'warning',
       onConfirm: async (_val: string) => {
         try {
@@ -384,7 +384,7 @@ function AppContent() {
     e.preventDefault();
     if (!diplomaModal.student) return;
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes emitir diplomas.'); return; }
-    if (!isAnaliticoCompleto(diplomaModal.student)) { toast.error('AnalÃ­tico incompleto: faltan notas obligatorias.'); return; }
+    if (!isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
 
     const formData = new FormData(e.currentTarget);
     const data = {
@@ -429,7 +429,7 @@ function AppContent() {
     setConfirmModal({
       open: true,
       title: 'Eliminar Seleccionados',
-      message: `Â¿EstÃ¡s seguro de que deseas eliminar los ${selectedStudents.length} alumnos seleccionados? Esta acciÃ³n es permanente.`,
+      message: `¿Estás seguro de que deseas eliminar los ${selectedStudents.length} alumnos seleccionados? Esta acción es permanente.`,
       type: 'danger',
       onConfirm: async () => {
         setIsUploading(true);
@@ -448,7 +448,7 @@ function AppContent() {
             toast.error(data.error || 'Error al eliminar alumnos.');
           }
         } catch (err) {
-          toast.error('Error de conexiÃ³n.');
+          toast.error('Error de conexión.');
         } finally {
           setIsUploading(false);
           setConfirmModal(prev => ({ ...prev, open: false }));
@@ -462,14 +462,14 @@ function AppContent() {
     setConfirmModal({
       open: true,
       title: 'Reiniciar Base de Datos',
-      message: 'Â¡ATENCIÃ“N! Esta acciÃ³n eliminarÃ¡ a TODOS los alumnos, sus notas y su historial permanentemente. Para confirmar, escribÃ­ "BORRAR TODO" en el campo de abajo:',
+      message: '¡ATENCIÓN! Esta acción eliminará a TODOS los alumnos, sus notas y su historial permanentemente. Para confirmar, escribí "BORRAR TODO" en el campo de abajo:',
       type: 'danger',
       withInput: true,
-      inputLabel: 'ConfirmaciÃ³n',
+      inputLabel: 'Confirmación',
       inputPlaceholder: 'BORRAR TODO',
       onConfirm: async (val: string) => {
         if (val.trim() !== 'BORRAR TODO') {
-          toast.error('La palabra de confirmaciÃ³n no coincide.');
+          toast.error('La palabra de confirmación no coincide.');
           return;
         }
         setIsUploading(true);
@@ -484,7 +484,7 @@ function AppContent() {
             toast.error(data.error || 'Error al reiniciar');
           }
         } catch (err) {
-          toast.error('Error de conexiÃ³n');
+          toast.error('Error de conexión');
         } finally {
           setIsUploading(false);
           setConfirmModal(prev => ({ ...prev, open: false }));
@@ -502,7 +502,7 @@ function AppContent() {
     // VALIDACION: Solo si pasa a emitido
     if (nuevoEstado === 'emitido' && selectedStudent) {
       if (!isAnaliticoCompleto(selectedStudent)) {
-        toast.error("âš ï¸ AnalÃ­tico Incompleto: Faltan materias obligatorias.");
+        toast.error('⚠️ Analítico Incompleto: Faltan materias obligatorias.');
       }
     }
 
@@ -520,7 +520,7 @@ function AppContent() {
         if (selectedStudent?.id === id) {
           setSelectedStudent(prev => prev ? ({ ...prev, estado_analitico: data.estado }) : null);
         }
-        toast.success(nuevoEstado === 'emitido' ? 'Â¡AnalÃ­tico Emitido!' : 'Revertido a Borrador');
+        toast.success(nuevoEstado === 'emitido' ? '¡Analítico Emitido!' : 'Revertido a Borrador');
       } catch (err: any) {
         toast.error(err.message || 'Error al cambiar estado');
       }
@@ -531,7 +531,7 @@ function AppContent() {
       setConfirmModal({
         open: true,
         title: 'Revertir a Borrador',
-        message: 'IngresÃ¡ el motivo por el cual se revierte el estado:',
+        message: 'Ingresá el motivo por el cual se revierte el estado:',
         type: 'warning',
         withInput: true,
         inputLabel: 'Motivo',
@@ -633,7 +633,7 @@ function AppContent() {
   const downloadPDF = (student: StudentData) => {
     if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes generar PDFs.'); return; }
-    if (!isAnaliticoCompleto(student)) { toast.error('AnalÃ­tico incompleto: faltan notas obligatorias.'); return; }
+    if (!isAnaliticoCompleto(student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
     window.open(`${API_URL}/api/students/${student.id}/certificate`, '_blank');
   };
 
@@ -644,23 +644,23 @@ function AppContent() {
   };
   */
 
-  // Descarga el PDF y marca automÃ¡ticamente como Emitido
+  // Descarga el PDF y marca automáticamente como Emitido
   const downloadPDFAndEmit = async (student: StudentData) => {
     if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes emitir.'); return; }
     if (!isAnaliticoCompleto(student)) {
-      toast.error('AnalÃ­tico incompleto: faltan notas obligatorias.');
+      toast.error('Analítico incompleto: faltan notas obligatorias.');
       return;
     }
 
-    // 1. Descargar AnalÃ­tico
+    // 1. Descargar Analítico
     downloadPDF(student);
     // setTimeout(() => downloadDiploma(student), 800); // DESACTIVADO TEMPORALMENTE
 
-    // 2. Marcar como Emitido si todavÃ­a no lo estaba
+    // 2. Marcar como Emitido si todavía no lo estaba
     if (student.estado_analitico !== 'emitido') {
       if (!isAnaliticoCompleto(student)) {
-        toast.error("âš ï¸ Generado: Faltan notas obligatorias.");
+        toast.error('⚠️ Generado: Faltan notas obligatorias.');
       }
       try {
         const res = await fetch(
@@ -716,7 +716,7 @@ function AppContent() {
               <School className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 text-center">ESCUELA MARADONA MENOTTI</h1>
-            <p className="text-slate-500 text-sm">Sistema de GestiÃ³n de AnalÃ­ticos</p>
+            <p className="text-slate-500 text-sm">Sistema de Gestión de Analíticos</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -781,7 +781,7 @@ function AppContent() {
             <p className="text-4xl font-extrabold text-blue-900">{totalAlumnos}</p>
           </div>
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="text-emerald-700 text-sm font-medium mb-3 uppercase tracking-wider">Con AnalÃ­tico</h3>
+            <h3 className="text-emerald-700 text-sm font-medium mb-3 uppercase tracking-wider">Con Analítico</h3>
             <p className="text-4xl font-extrabold text-emerald-800">{conAnalitico}</p>
           </div>
           <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-6 rounded-2xl border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
@@ -881,7 +881,7 @@ function AppContent() {
                   <input type="date" name="fecha_fin_cursada" className="w-full text-sm border border-slate-200 rounded-xl p-2" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1 opacity-90">Fecha EmisiÃ³n</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1 opacity-90">Fecha Emisión</label>
                   <input type="date" name="fecha_emision" className="w-full text-sm border border-slate-200 rounded-xl p-2" />
                 </div>
               </div>
@@ -939,7 +939,7 @@ function AppContent() {
                 checked={filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).every(s => s.id && selectedStudents.includes(s.id))}
                 onChange={toggleSelectAll}
               />
-              <span className="text-sm font-bold text-slate-600">Seleccionar todos en esta pÃ¡gina</span>
+              <span className="text-sm font-bold text-slate-600">Seleccionar todos en esta página</span>
             </div>
           )}
           <AnimatePresence mode="popLayout">
@@ -983,15 +983,15 @@ function AppContent() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs font-semibold mt-1">
                         <span className="flex items-center gap-1 text-slate-500">DNI: {student.dni}</span>
-                        <span className="hidden sm:inline text-slate-300">â€¢</span>
-                        <span className="flex items-center gap-1 text-slate-500">MATRÃCULA: {student.dni}</span>
-                        <span className="hidden sm:inline text-slate-300">â€¢</span>
+                        <span className="hidden sm:inline text-slate-300">⬢</span>
+                        <span className="flex items-center gap-1 text-slate-500">MATRÍCULA: {student.dni}</span>
+                        <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider border border-slate-200">
                           LICENCIA {student.licencia || 'S/LI'}
                         </span>
-                        <span className="hidden sm:inline text-slate-300">â€¢</span>
+                        <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="text-blue-800 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider border border-blue-100">
-                          COMISIÃ“N {student.comision || '-'}
+                          COMISIÓN {student.comision || '-'}
                         </span>
                       </div>
                     </div>
@@ -1023,7 +1023,7 @@ function AppContent() {
                         <button
                           onClick={() => downloadPDF(student)}
                           className="p-2 text-blue-600 hover:bg-blue-50 hover:text-blue-800 rounded-lg transition-colors"
-                          title="Descargar AnalÃ­tico"
+                          title="Descargar Analítico"
                         >
                           <Download className="w-5 h-5" />
                         </button>
@@ -1063,7 +1063,7 @@ function AppContent() {
                   <option value={100}>100</option>
                   <option value={500}>500</option>
                 </select>
-                <span>por pÃ¡gina</span>
+                <span>por página</span>
               </div>
 
               <div className="flex items-center gap-1.5 bg-white border border-slate-200 p-1 rounded-xl shadow-sm">
@@ -1113,7 +1113,7 @@ function AppContent() {
             
             <form onSubmit={handleGenerateDiploma} className="p-6 space-y-5">
               <p className="text-sm text-slate-500">
-                ConfirmÃ¡ los datos para el diploma de <span className="font-bold text-slate-800">{diplomaModal.student?.nombre} {diplomaModal.student?.apellido}</span>.
+                Confirmá los datos para el diploma de <span className="font-bold text-slate-800">{diplomaModal.student?.nombre} {diplomaModal.student?.apellido}</span>.
               </p>
               
               <div className="space-y-4">
@@ -1128,7 +1128,7 @@ function AppContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fecha de EmisiÃ³n</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fecha de Emisión</label>
                   <input 
                     required 
                     type="date" 
@@ -1181,7 +1181,7 @@ function AppContent() {
                             onClick={startEditDatos}
                             className="text-blue-600 hover:text-blue-800 text-xs font-bold border border-blue-200 bg-blue-50 px-2 py-0.5 rounded transition-colors"
                           >
-                            âœï¸ Editar Datos
+                            ✏️ Editar Datos
                           </button>
                         )}
                       </div>
@@ -1248,7 +1248,7 @@ function AppContent() {
                   <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-800 animate-pulse shadow-sm">
                     <AlertTriangle className="w-6 h-6 shrink-0" />
                     <div>
-                      <p className="font-bold text-sm text-amber-900 leading-tight">âš ï¸ AnalÃ­tico Generado: Faltan Notas</p>
+                      <p className="font-bold text-sm text-amber-900 leading-tight">⚠️ Analítico Generado: Faltan Notas</p>
                       <p className="text-xs text-amber-700 mt-0.5">Marcado como emitido pero con materias obligatorias pendientes.</p>
                     </div>
                   </div>
@@ -1263,13 +1263,13 @@ function AppContent() {
                     <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.nacionalidad || 'SIN ESPECIFICAR'}</p>
                   </div>
                   <div className="bg-emerald-50 p-4 border border-emerald-100 rounded-2xl">
-                    <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">ComisiÃ³n</p>
-                    <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.comision || 'SIN COMISIÃ“N'}</p>
+                    <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">Comisión</p>
+                    <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.comision || 'SIN COMISIÓN'}</p>
                   </div>
                   {selectedStudent.situacion && (
                     <div className="col-span-2 bg-indigo-50 p-4 border border-indigo-100 rounded-2xl flex items-center justify-between">
                       <div>
-                        <p className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">SituaciÃ³n AcadÃ©mica</p>
+                        <p className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">Situación Académica</p>
                         <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.situacion}</p>
                       </div>
                       <div className="bg-indigo-100 w-10 h-10 rounded-full flex items-center justify-center">
@@ -1301,7 +1301,7 @@ function AppContent() {
                           value={newMateria}
                           onChange={e => setNewMateria(e.target.value)}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-900 outline-none"
-                          placeholder="Ej: TÃ‰CNICA TÃCTICA I"
+                          placeholder="Ej: TÉCNICA TÁCTICA I"
                         />
                       </div>
                       <div className="w-24">
@@ -1343,7 +1343,7 @@ function AppContent() {
                         const guardarNota = async (mat: string, val: string) => {
                           const num = parseFloat(val);
                           if (isNaN(num) || num < 0 || num > 10) {
-                            toast.error(`Nota invÃ¡lida: "${val}". Debe ser un nÃºmero entre 0 y 10.`);
+                            toast.error(`Nota inválida: "${val}". Debe ser un número entre 0 y 10.`);
                             return;
                           }
                           if (num === notaActual) return;
@@ -1397,7 +1397,7 @@ function AppContent() {
                                       disabled={isSaving}
                                       className="text-xs bg-blue-900 hover:bg-blue-950 text-white px-2 py-1 rounded-lg font-bold transition-colors disabled:opacity-50"
                                     >
-                                      {isSaving ? '...' : 'âœ“'}
+                                      {isSaving ? '...' : 'OK'}
                                     </button>
                                   )}
                                 </>
@@ -1423,7 +1423,7 @@ function AppContent() {
                     ) : (
                       <div className="bg-amber-50 border border-amber-100 p-6 rounded-2xl text-center">
                         <p className="text-amber-700 font-semibold mb-1">Licencia no reconocida o sin plan definido.</p>
-                        <p className="text-amber-600/70 text-sm">VerificÃ¡ que el alumno tenga una licencia CB, A o PRO asignada.</p>
+                        <p className="text-amber-600/70 text-sm">Verificá que el alumno tenga una licencia CB, A o PRO asignada.</p>
                       </div>
                     )
                   );
@@ -1443,7 +1443,7 @@ function AppContent() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Fecha de EmisiÃ³n</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Fecha de Emisión</label>
                       <input
                         type="date"
                         value={selectedStudent.fecha_emision || ''}
@@ -1507,7 +1507,7 @@ function AppContent() {
                         className="px-4 py-2.5 rounded-xl font-bold flex gap-2 items-center transition-all shadow-sm border bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300"
                         title="Revertir a Borrador (requiere justificación)"
                       >
-                        ? Desmarcar Emitido
+                        Desmarcar Emitido
                       </button>
                     )}
 
@@ -1566,7 +1566,7 @@ function AppContent() {
 
   const renderUsuarios = () => (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
-      <h2 className="text-3xl font-bold text-slate-900">GestiÃ³n de Usuarios</h2>
+      <h2 className="text-3xl font-bold text-slate-900">Gestión de Usuarios</h2>
 
       {/* Formulario crear editor */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -1633,7 +1633,7 @@ function AppContent() {
         </div>
         {appUsers.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
-            <p>No hay usuarios registrados todavÃ­a.</p>
+            <p>No hay usuarios registrados todavía.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-50">
@@ -1723,7 +1723,7 @@ function AppContent() {
               className="flex items-center justify-center gap-2 w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl transition-all border border-red-500/20"
             >
               <LogOut className="w-4 h-4" />
-              <span className="text-sm font-bold">Cerrar SesiÃ³n</span>
+              <span className="text-sm font-bold">Cerrar Sesión</span>
             </button>
           </div>
         </div>
@@ -1733,7 +1733,7 @@ function AppContent() {
       <div className="flex-1 flex flex-col h-full bg-slate-50 min-w-0">
         <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center sticky top-0 z-10 shadow-sm">
           <h1 className="text-slate-800 text-2xl font-black tracking-tight">
-            {activeTab === 'dashboard' ? 'Panel de Control' : activeTab === 'usuarios' ? 'GestiÃ³n de Usuarios' : 'Base de Datos de Alumnos'}
+            {activeTab === 'dashboard' ? 'Panel de Control' : activeTab === 'usuarios' ? 'Gestión de Usuarios' : 'Base de Datos de Alumnos'}
           </h1>
         </header>
 
@@ -1747,7 +1747,7 @@ function AppContent() {
       {/* TOASTER para notificaciones */}
       <Toaster position="bottom-right" toastOptions={{ duration: 4000, style: { fontWeight: 'bold' } }} />
 
-      {/* MODAL DE CONFIRMACIÃ“N CUSTOM */}
+      {/* MODAL DE CONFIRMACIÓN CUSTOM */}
       <AnimatePresence>
         {confirmModal.open && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
