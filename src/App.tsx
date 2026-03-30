@@ -1172,19 +1172,19 @@ function AppContent() {
                     }`}>
                       <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : 'text-[#002d2b]'}`} />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 mb-0.5 line-clamp-1">
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-lg font-bold text-slate-900 leading-tight">
                         {student.nombre} {student.apellido && student.apellido !== 'Sin Apellido' && !student.nombre.includes(student.apellido) ? student.apellido : ''} {student.situacion === 'DUPLICADO' && <span className="text-rose-600 text-sm ml-2">(DUPLICADO)</span>}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs font-semibold mt-1">
+                      <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs font-semibold">
                         <span className="flex items-center gap-1 text-slate-500">ID: {student.dni}</span>
                         <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="flex items-center gap-1 text-slate-500">MATRÍCULA: {student.dni}</span>
-                        <span className="hidden sm:inline text-slate-300">⬢</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs font-semibold">
                         <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider border border-slate-200">
                           LICENCIA {formatLicencia(student.licencia)}
                         </span>
-                        <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="text-[#002d2b] bg-[#0ffff4]/15 px-2 py-0.5 rounded uppercase tracking-wider border border-[#0ffff4]/40">
                           COMISIÓN {student.comision || '-'}
                         </span>
