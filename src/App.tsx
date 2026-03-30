@@ -1146,7 +1146,7 @@ function AppContent() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   onClick={() => { setSelectedStudent(student); if (student.id) loadStudentDetail(student.id); }}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group ${
+                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group min-h-[110px] ${
                     selectedStudents.includes(student.id || '') 
                       ? 'bg-[#0ffff4]/15 border-[#00968f] shadow-md ring-1 ring-[#00968f]' 
                       : student.situacion === 'DUPLICADO'
