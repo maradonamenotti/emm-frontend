@@ -1529,7 +1529,7 @@ function AppContent() {
                   return planMaterias.length > 0 ? (
                     <div className="space-y-1 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                       {planMaterias.map((materia, i) => {
-                        const notaActual = notasMap[stripAccents(materia)] ⚠️ 0;
+                        const notaActual = notasMap[stripAccents(materia)] ?? 0;
                         const tiene = notaActual > 0;
                         const pending = pendingNotas[materia];
                         const hasPending = pending !== undefined && parseFloat(pending) !== notaActual;
