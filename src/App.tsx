@@ -116,7 +116,8 @@ function AppContent() {
 
   const isAnaliticoCompleto = (student: StudentData) => {
     const required = getSubjectsByLicencia(student.licencia || '');
-    if (required.length === 0) return true;
+    // Si no tenemos plan definido, al menos debe tener alguna nota para considerarlo completo
+    if (required.length === 0) return (student.notas?.length || 0) > 0;
 
     const normalize = (s: string) => s.toUpperCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
@@ -744,6 +745,14 @@ function AppContent() {
   const uniqueLicencias = Array.from(new Set(students.map(s => s.licencia).filter(Boolean)));
   const uniqueComisiones = Array.from(new Set(students.map(s => s.comision).filter(Boolean)));
 
+  const formatLicencia = (lic?: string) => {
+    if (!lic) return 'S/LI';
+    const upper = lic.toUpperCase();
+    if (upper.includes('TRAYECTORIA DESTACADA') && upper.includes('1')) return 'TD 1';
+    if (upper.includes('TRAYECTORIA DESTACADA') && upper.includes('2')) return 'TD 2';
+    return lic;
+  };
+
   const filteredStudents = students.filter(s => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -1173,7 +1182,7 @@ function AppContent() {
                         <span className="flex items-center gap-1 text-slate-500">MATRÍCULA: {student.dni}</span>
                         <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider border border-slate-200">
-                          LICENCIA {student.licencia || 'S/LI'}
+                          LICENCIA {formatLicencia(student.licencia)}
                         </span>
                         <span className="hidden sm:inline text-slate-300">⬢</span>
                         <span className="text-[#002d2b] bg-[#0ffff4]/15 px-2 py-0.5 rounded uppercase tracking-wider border border-[#0ffff4]/40">
@@ -1520,7 +1529,7 @@ function AppContent() {
                   return planMaterias.length > 0 ? (
                     <div className="space-y-1 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                       {planMaterias.map((materia, i) => {
-                        const notaActual = notasMap[stripAccents(materia)] ?? 0;
+                        const notaActual = notasMap[stripAccents(materia)] ⚠️ 0;
                         const tiene = notaActual > 0;
                         const pending = pendingNotas[materia];
                         const hasPending = pending !== undefined && parseFloat(pending) !== notaActual;
@@ -1573,7 +1582,7 @@ function AppContent() {
                                     max="10"
                                     value={pending !== undefined ? pending : (notaActual || '')}
                                     onChange={e => setPendingNotas(prev => ({ ...prev, [materia]: e.target.value }))}
-                                    onKeyDown={e => { if (e.key === 'Enter') guardarNota(materia, pending ?? String(notaActual)); }}
+                                    onKeyDown={e => { if (e.key === 'Enter') guardarNota(materia, pending ⚠️ String(notaActual)); }}
                                     className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-[#00968f] transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : tiene ? 'bg-[#0ffff4]/15 text-[#002d2b] border-[#0ffff4]/40' : 'bg-red-50 text-red-500 border-red-200'}`}
                                     placeholder="0"
                                   />
