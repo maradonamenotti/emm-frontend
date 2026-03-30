@@ -83,6 +83,7 @@ function AppContent() {
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [completenessFilter, setCompletenessFilter] = useState<'all' | 'completos' | 'incompletos'>('all');
   const [licenciaFilter, setLicenciaFilter] = useState('all');
   const [comisionFilter, setComisionFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -159,6 +160,19 @@ function AppContent() {
         else setBackendStatus('error');
       })
       .catch(() => setBackendStatus('error'));
+
+    // Restaurar sesión si existe
+    const saved = localStorage.getItem('mm-user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setUser(parsed);
+        if (parsed.role !== 'admin') setActiveTab('alumnos');
+        fetchStudents();
+      } catch {
+        localStorage.removeItem('mm-user');
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -170,6 +184,15 @@ function AppContent() {
       fetchStudents();
     }
   }, [user]);
+
+  // Actualizar detalle mientras el modal esté abierto (incluye cambios de otros usuarios)
+  useEffect(() => {
+    if (!selectedStudent?.id) return;
+    const id = selectedStudent.id;
+    loadStudentDetail(id);
+    const interval = setInterval(() => loadStudentDetail(id), 5000);
+    return () => clearInterval(interval);
+  }, [selectedStudent?.id]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,7 +208,9 @@ function AppContent() {
         setError(data.error || 'Credenciales inválidas');
         return;
       }
-      setUser({ email: data.email, role: data.role, name: data.nombre });
+      const userData = { email: data.email, role: data.role, name: data.nombre };
+      setUser(userData);
+      localStorage.setItem('mm-user', JSON.stringify(userData));
       if (data.role !== 'admin') setActiveTab('alumnos');
       setError('');
     } catch (err) {
@@ -253,6 +278,7 @@ function AppContent() {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('mm-user');
     setEmail('');
     setPassword('');
     setStudents([]);
@@ -727,7 +753,12 @@ function AppContent() {
     const matchesStatus = statusFilter === 'all' || s.situacion === statusFilter;
     const matchesLicencia = licenciaFilter === 'all' || (s.licencia || '').toUpperCase() === licenciaFilter.toUpperCase();
     const matchesComision = comisionFilter === 'all' || (s.comision || '').toUpperCase() === comisionFilter.toUpperCase();
-    return matchesSearch && matchesStatus && matchesLicencia && matchesComision;
+    const completo = isAnaliticoCompleto(s);
+    const matchesCompleteness =
+      completenessFilter === 'all' ||
+      (completenessFilter === 'completos' && completo) ||
+      (completenessFilter === 'incompletos' && !completo);
+    return matchesSearch && matchesStatus && matchesLicencia && matchesComision && matchesCompleteness;
   });
 
   if (!user) {
@@ -1027,7 +1058,7 @@ function AppContent() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Buscar por nombre o ID..."
+              placeholder="Buscar por nombre, apellido o ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium"
@@ -1063,6 +1094,15 @@ function AppContent() {
               {uniqueComisiones.map(c => (
                 <option key={c as string} value={c as string}>{c as string}</option>
               ))}
+            </select>
+            <select
+              value={completenessFilter}
+              onChange={(e) => setCompletenessFilter(e.target.value as 'all' | 'completos' | 'incompletos')}
+              className="min-w-[150px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value="all">Completos e incompletos</option>
+              <option value="completos">Solo completos</option>
+              <option value="incompletos">Solo incompletos</option>
             </select>
             <button
               onClick={exportToExcel}
