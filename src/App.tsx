@@ -1062,52 +1062,52 @@ function AppContent() {
         </div>
       )}
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row gap-3 mb-2">
-          <div className="relative shadow-sm rounded-xl flex-1 min-w-[220px]">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 mb-3 items-stretch">
+          <div className="relative shadow-sm rounded-xl col-span-1 xl:col-span-2 min-w-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Buscar por nombre, apellido o ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium"
+              className="w-full h-14 pl-12 pr-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium"
             />
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="min-w-[170px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value="all">Todas las situaciones</option>
-              {uniqueStatuses.map(st => (
-                <option key={st as string} value={st as string}>{st as string}</option>
-              ))}
-            </select>
-            <select
-              value={licenciaFilter}
-              onChange={(e) => setLicenciaFilter(e.target.value)}
-              className="min-w-[150px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value="all">Todas las licencias</option>
-              {uniqueLicencias.map(l => (
-                <option key={l as string} value={l as string}>{l as string}</option>
-              ))}
-            </select>
-            <select
-              value={comisionFilter}
-              onChange={(e) => setComisionFilter(e.target.value)}
-              className="min-w-[150px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
-            >
-              <option value="all">Todas las comisiones</option>
-              {uniqueComisiones.map(c => (
-                <option key={c as string} value={c as string}>{c as string}</option>
-              ))}
-            </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+          >
+            <option value="all">Todas las situaciones</option>
+            {uniqueStatuses.map(st => (
+              <option key={st as string} value={st as string}>{st as string}</option>
+            ))}
+          </select>
+          <select
+            value={licenciaFilter}
+            onChange={(e) => setLicenciaFilter(e.target.value)}
+            className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+          >
+            <option value="all">Todas las licencias</option>
+            {uniqueLicencias.map(l => (
+              <option key={l as string} value={l as string}>{l as string}</option>
+            ))}
+          </select>
+          <select
+            value={comisionFilter}
+            onChange={(e) => setComisionFilter(e.target.value)}
+            className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+          >
+            <option value="all">Todas las comisiones</option>
+            {uniqueComisiones.map(c => (
+              <option key={c as string} value={c as string}>{c as string}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 items-center">
             <select
               value={completenessFilter}
               onChange={(e) => setCompletenessFilter(e.target.value as 'all' | 'completos' | 'incompletos')}
-              className="min-w-[150px] h-full min-h-[56px] px-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+              className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm flex-1"
             >
               <option value="all">Completos e incompletos</option>
               <option value="completos">Solo completos</option>
@@ -1115,11 +1115,11 @@ function AppContent() {
             </select>
             <button
               onClick={exportToExcel}
-              className="flex items-center gap-2 h-full min-h-[56px] px-5 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-bold transition-all shadow-sm shrink-0 whitespace-nowrap hover:-translate-y-0.5 active:scale-[0.98]"
+              className="h-14 px-4 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-bold transition-all shadow-sm whitespace-nowrap hover:-translate-y-0.5 active:scale-[0.98]"
               title="Exportar listado actual a Excel"
             >
-              <FileSpreadsheet className="w-5 h-5" />
-              <span className="hidden md:inline">Exportar Excel</span>
+              <FileSpreadsheet className="w-5 h-5 inline-block mr-2 align-middle" />
+              <span className="align-middle">Exportar</span>
             </button>
           </div>
         </div>
