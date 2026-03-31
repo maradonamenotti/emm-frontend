@@ -304,7 +304,7 @@ function AppContent() {
 
     try {
       if (importConfig.mode === 'db') {
-        const res = await fetch(`${API_URL}/api/process-excel?user=${encodeURIComponent(user?.email || 'Sistema')}`, { method: 'POST', body: submitData });
+        const res = await fetch(`${API_URL}/api/process-excel?${getUserQuery()}`, { method: 'POST', body: submitData });
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.error || 'Error al importar en servidor');
@@ -342,7 +342,7 @@ function AppContent() {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${API_URL}/api/quinttos?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+      const response = await fetch(`${API_URL}/api/quinttos?${getUserQuery()}`, {
         method: 'POST',
         body: formData,
       });
@@ -371,7 +371,7 @@ function AppContent() {
       type: 'danger',
       onConfirm: async (_val: string) => {
         try {
-          await fetch(`${API_URL}/api/students/${id}?user=${encodeURIComponent(user?.email || 'Sistema')}`, { method: 'DELETE' });
+          await fetch(`${API_URL}/api/students/${id}?${getUserQuery()}`, { method: 'DELETE' });
           setStudents(prev => prev.filter(s => s.id !== id));
           if (selectedStudent?.id === id) closeStudentModal();
         } catch (err) {
@@ -391,7 +391,7 @@ function AppContent() {
       type: 'warning',
       onConfirm: async (_val: string) => {
         try {
-          await fetch(`${API_URL}/api/students/${id}/notas?user=${encodeURIComponent(user?.email || 'Sistema')}`, { method: 'DELETE' });
+          await fetch(`${API_URL}/api/students/${id}/notas?${getUserQuery()}`, { method: 'DELETE' });
           await fetchStudents();
           if (selectedStudent?.id === id) {
             setSelectedStudent(prev => prev ? ({ ...prev, notas: [], estado_analitico: 'borrador', promedio: 0 }) : null);
@@ -478,7 +478,7 @@ function AppContent() {
       onConfirm: async () => {
         setIsUploading(true);
         try {
-          const res = await fetch(`${API_URL}/api/students/bulk?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+          const res = await fetch(`${API_URL}/api/students/bulk?${getUserQuery()}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: selectedStudents })
@@ -518,7 +518,7 @@ function AppContent() {
         }
         setIsUploading(true);
         try {
-          const res = await fetch(`${API_URL}/api/database/reset?user=${encodeURIComponent(user?.email || 'Sistema')}`, { method: 'DELETE' });
+          const res = await fetch(`${API_URL}/api/database/reset?${getUserQuery()}`, { method: 'DELETE' });
           const data = await res.json();
           if (res.ok) {
             toast.success(data.message || 'Base de datos reiniciada.');
@@ -552,7 +552,7 @@ function AppContent() {
 
     const executeToggle = async (motivoAdicional = '') => {
       try {
-        const res = await fetch(`${API_URL}/api/students/${id}/estado?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+        const res = await fetch(`${API_URL}/api/students/${id}/estado?${getUserQuery()}`, {
           method: 'PUT',
           body: JSON.stringify({ estado: nuevoEstado, motivo: motivoAdicional }),
           headers: { 'Content-Type': 'application/json' }
@@ -596,7 +596,7 @@ function AppContent() {
   const handleSaveFechas = async () => {
     if (!selectedStudent || !selectedStudent.id) return;
     try {
-      const res = await fetch(`${API_URL}/api/students/${selectedStudent.id}/dates?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+      const res = await fetch(`${API_URL}/api/students/${selectedStudent.id}/dates?${getUserQuery()}`, {
         method: 'PUT',
         body: JSON.stringify({ fecha_emision: selectedStudent.fecha_emision, fecha_fin_cursada: selectedStudent.fecha_fin_cursada }),
         headers: { 'Content-Type': 'application/json' }
@@ -624,7 +624,7 @@ function AppContent() {
   const saveDatos = async () => {
     if (!selectedStudent?.id) return;
     try {
-      await fetch(`${API_URL}/api/students/${selectedStudent.id}/datos?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+      await fetch(`${API_URL}/api/students/${selectedStudent.id}/datos?${getUserQuery()}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -655,7 +655,7 @@ function AppContent() {
   const saveNotaManual = async () => {
     if (!selectedStudent?.id || !newMateria.trim() || !newNota) return;
     try {
-      const res = await fetch(`${API_URL}/api/students/${selectedStudent.id}/nota?user=${encodeURIComponent(user?.email || 'Sistema')}`, {
+      const res = await fetch(`${API_URL}/api/students/${selectedStudent.id}/nota?${getUserQuery()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ asignatura: newMateria.trim(), nota: parseFloat(newNota) })
@@ -709,7 +709,7 @@ function AppContent() {
       }
       try {
         const res = await fetch(
-          `${API_URL}/api/students/${student.id}/estado?user=${encodeURIComponent(user?.email || 'Sistema')}`,
+          `${API_URL}/api/students/${student.id}/estado?${getUserQuery()}`,
           { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'emitido', motivo: 'Generado desde el sistema' }) }
         );
         const data = await res.json();
@@ -752,6 +752,8 @@ function AppContent() {
     if (upper.includes('TRAYECTORIA DESTACADA') && upper.includes('2')) return 'TD 2';
     return lic;
   };
+
+  const getUserQuery = () => `user=${encodeURIComponent(user?.email || 'Sistema')}&nombre=${encodeURIComponent(user?.name || '')}`;
 
   const formatUserDisplay = (email?: string, nombre?: string) => {
     if (nombre && nombre.trim()) return nombre;
@@ -1551,7 +1553,7 @@ function AppContent() {
                           if (num === notaActual) return;
                           setSavingNota(mat);
                           try {
-                            const url = `${API_URL}/api/students/${selectedStudent.id}/nota?user=${encodeURIComponent(user?.email || 'Sistema')}`;
+                            const url = `${API_URL}/api/students/${selectedStudent.id}/nota?${getUserQuery()}`;
                             console.log('[guardarNota] POST', url, { asignatura: mat, nota: num });
                             const res = await fetch(url, {
                               method: 'POST',
