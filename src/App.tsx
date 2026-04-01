@@ -98,6 +98,16 @@ function AppContent() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'editor' | 'viewer'>('editor');
 
+  // Alta manual de alumno
+  const [newStudentModal, setNewStudentModal] = useState(false);
+  const [newStuLicencia, setNewStuLicencia] = useState<'CB' | 'A' | 'PRO' | 'TD1' | 'TD2' | 'ACTUALIZACION'>('CB');
+  const [newStuNombre, setNewStuNombre] = useState('');
+  const [newStuApellido, setNewStuApellido] = useState('');
+  const [newStuDni, setNewStuDni] = useState('');
+  const [newStuNacionalidad, setNewStuNacionalidad] = useState('ARGENTINA');
+  const [newStuFechaEmision, setNewStuFechaEmision] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [newStuFechaFin, setNewStuFechaFin] = useState<string>('');
+
   // Modal de confirmación personalizado
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (val: string) => void; type?: 'danger' | 'warning' | 'info'; withInput?: boolean; inputLabel?: string; inputPlaceholder?: string }>({ open: false, title: '', message: '', onConfirm: () => { } });
   const [confirmInput, setConfirmInput] = useState('');
@@ -115,6 +125,7 @@ function AppContent() {
   const [newNota, setNewNota] = useState('');
 
   const isAnaliticoCompleto = (student: StudentData) => {
+    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION') return true;
     const required = getSubjectsByLicencia(student.licencia || '');
     // Si no tenemos plan definido, al menos debe tener alguna nota para considerarlo completo
     if (required.length === 0) return (student.notas?.length || 0) > 0;
@@ -288,6 +299,44 @@ function AppContent() {
     setActiveTab('dashboard');
   };
 
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes crear alumnos.'); return; }
+    if (!newStuNombre || !newStuApellido || !newStuDni) { toast.error('Completa nombre, apellido y documento'); return; }
+    setIsUploading(true);
+    try {
+      const payload = {
+        nombre: newStuNombre,
+        apellido: newStuApellido,
+        documento: newStuDni,
+        nacionalidad: newStuNacionalidad,
+        licencia: newStuLicencia,
+        fecha_emision: newStuFechaEmision,
+        fecha_fin_cursada: newStuLicencia === 'ACTUALIZACION' ? undefined : newStuFechaFin
+      };
+      const res = await fetch(`${API_URL}/api/students?${getUserQuery()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error creando alumno');
+      toast.success('Alumno creado correctamente');
+      setNewStudentModal(false);
+      setNewStuNombre('');
+      setNewStuApellido('');
+      setNewStuDni('');
+      setNewStuNacionalidad('ARGENTINA');
+      setNewStuFechaFin('');
+      setNewStuFechaEmision(new Date().toISOString().split('T')[0]);
+      await fetchStudents();
+    } catch (err: any) {
+      toast.error(err.message || 'Error creando alumno');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleModalSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -428,7 +477,8 @@ function AppContent() {
     e.preventDefault();
     if (!diplomaModal.student) return;
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes emitir diplomas.'); return; }
-    if (!isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
+    const isAct = (diplomaModal.student.licencia || '').toUpperCase() === 'ACTUALIZACION';
+    if (!isAct && !isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
 
     const formData = new FormData(e.currentTarget);
     const data = {
@@ -990,39 +1040,52 @@ function AppContent() {
           <p className="text-slate-500 text-sm">Sincronice el padron e importe notas para generar certificados.</p>
         </div>
 
-        {user.role === 'admin' && (
-          <div className="flex items-center justify-end gap-3 flex-wrap">
+        <div className="flex items-center justify-end gap-3 flex-wrap">
+          {user.role !== 'viewer' && (
             <button
-              onClick={handleResetDatabase}
+              onClick={() => setNewStudentModal(true)}
               disabled={isUploading}
-              className={`flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title="Borrar TODOS los alumnos y notas (Reset Total)"
+              className={`flex items-center gap-2 px-4 py-3 bg-[#0f766e] hover:bg-[#0b5f59] text-white font-medium rounded-xl transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Reiniciar BD</span>
+              <User className="w-4 h-4" />
+              <span>Nuevo Alumno</span>
             </button>
-            {selectedStudents.length > 0 && (
+          )}
+
+          {user.role === 'admin' && (
+            <>
               <button
-                onClick={handleBulkDelete}
+                onClick={handleResetDatabase}
                 disabled={isUploading}
-                className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title="Eliminar alumnos seleccionados"
+                className={`flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="Borrar TODOS los alumnos y notas (Reset Total)"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Eliminar {selectedStudents.length}</span>
+                <span>Reiniciar BD</span>
               </button>
-            )}
-            <label className={`flex items-center gap-2 px-4 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white font-medium rounded-xl cursor-pointer transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <Upload className="w-4 h-4" />
-              <span>Sincronizar QUINTTOS</span>
-              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQuinttosUpload} disabled={isUploading} />
-            </label>
-            <button onClick={() => setImportConfig({ isOpen: true, mode: 'db' })} disabled={isUploading} className={`flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <Upload className="w-4 h-4" />
-              <span>Importar Notas</span>
-            </button>
-          </div>
-        )}
+              {selectedStudents.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isUploading}
+                  className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title="Eliminar alumnos seleccionados"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Eliminar {selectedStudents.length}</span>
+                </button>
+              )}
+              <label className={`flex items-center gap-2 px-4 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white font-medium rounded-xl cursor-pointer transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <Upload className="w-4 h-4" />
+                <span>Sincronizar QUINTTOS</span>
+                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQuinttosUpload} disabled={isUploading} />
+              </label>
+              <button onClick={() => setImportConfig({ isOpen: true, mode: 'db' })} disabled={isUploading} className={`flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <Upload className="w-4 h-4" />
+                <span>Importar Notas</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {importConfig.isOpen && (
@@ -1070,6 +1133,81 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {newStudentModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+              <h2 className="text-xl font-bold text-slate-800">Nuevo Alumno</h2>
+              <button type="button" onClick={() => setNewStudentModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors bg-white p-1 rounded-full shadow-sm border border-slate-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateStudent} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+                  <input required value={newStuNombre} onChange={e => setNewStuNombre(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Apellido</label>
+                  <input required value={newStuApellido} onChange={e => setNewStuApellido(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Documento</label>
+                  <input required value={newStuDni} onChange={e => setNewStuDni(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Nacionalidad</label>
+                  <input value={newStuNacionalidad} onChange={e => setNewStuNacionalidad(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm uppercase" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Carrera / Licencia</label>
+                  <select value={newStuLicencia} onChange={e => setNewStuLicencia(e.target.value as any)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white">
+                    <option value="CB">Licencia CB</option>
+                    <option value="A">Licencia A</option>
+                    <option value="PRO">Licencia PRO</option>
+                    <option value="TD1">TD1</option>
+                    <option value="TD2">TD2</option>
+                    <option value="ACTUALIZACION">Curso de Actualización</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha de Emisión</label>
+                  <input type="date" value={newStuFechaEmision} onChange={e => setNewStuFechaEmision(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm" />
+                </div>
+              </div>
+              {newStuLicencia !== 'ACTUALIZACION' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha de Graduación / Fin de cursada</label>
+                    <input type="date" value={newStuFechaFin} onChange={e => setNewStuFechaFin(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm" />
+                  </div>
+                  <div className="flex items-center text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3">
+                    Al guardar se crean todas las materias de la licencia con nota 0.
+                  </div>
+                </div>
+              )}
+              {newStuLicencia === 'ACTUALIZACION' && (
+                <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  Solo se piden los datos que requiere el certificado del Curso de Actualización.
+                </p>
+              )}
+              <div className="pt-4 border-t border-slate-100 flex gap-3">
+                <button type="button" onClick={() => setNewStudentModal(false)} className="flex-1 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+                <button type="submit" disabled={isUploading} className="flex-1 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-bold transition-all shadow hover:-translate-y-0.5 active:scale-[0.98]">
+                  {isUploading ? 'Guardando...' : 'Crear alumno'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 mb-3 items-stretch">
           <div className="relative shadow-sm rounded-xl col-span-1 xl:col-span-2 min-w-0">

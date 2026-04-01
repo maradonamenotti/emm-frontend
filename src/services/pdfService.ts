@@ -89,6 +89,15 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "PSICOLOGÍA IV",
     "RECURSOS HUMANOS",
     "PROMEDIO GENERAL DE PRÁCTICAS"
+  ],
+  "TD1": [
+    "MÓDULO TD1"
+  ],
+  "TD2": [
+    "MÓDULO TD2"
+  ],
+  "ACTUALIZACION": [
+    // No lleva materias; se usa solo para el diploma del curso de actualización
   ]
 };
 
