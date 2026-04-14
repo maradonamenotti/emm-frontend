@@ -8,20 +8,15 @@ import {
   User,
   LogOut,
   FileText,
-  Info,
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   Trash2,
   Users,
   Search,
   UserPlus,
-  RefreshCw,
   X,
   School,
   LayoutDashboard,
-  FileDown,
-  Clock,
   Edit
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -29,7 +24,7 @@ import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './se
 import logo from './assets/logo.png';
 import logoHorizontal from './assets/logo_horizontal.png';
 
-type UserRole = 'admin' | 'editor' | 'viewer' | 'student';
+type UserRole = 'superadmin' | 'editor' | 'viewer' | 'student';
 
 interface UserProfile {
   id: string;
@@ -52,6 +47,8 @@ interface StudentData extends BaseStudentData {
   diploma_emitido?: boolean;
   fecha_emision?: string;
   fecha_fin_cursada?: string;
+  pagos_ok?: boolean;
+  documentacion_ok?: boolean;
   historial?: any[];
 }
 
@@ -82,7 +79,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function AppContent() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://analiticos-backend-production.up.railway.app';
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios' | 'horas-campo'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios'>('dashboard');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -107,10 +104,9 @@ function AppContent() {
   const [newUserNombre, setNewUserNombre] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'editor' | 'viewer'>('editor');
+  const [newUserRole, setNewUserRole] = useState<'superadmin' | 'editor' | 'viewer'>('editor');
   const [newUserPermissions, setNewUserPermissions] = useState<Record<string, string>>({
-    'analiticos': 'none',
-    'horas-campo': 'none'
+    'analiticos': 'none'
   });
 
   // Alta manual de alumno
@@ -123,24 +119,19 @@ function AppContent() {
   const [newStuFechaEmision, setNewStuFechaEmision] = useState<string>(new Date().toISOString().split('T')[0]);
   const [newStuFechaFin, setNewStuFechaFin] = useState<string>('');
 
-  // Horas de Campo
-  const [entregas, setEntregas] = useState<any[]>([]);
-
-  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
-  const [fieldHourSubTab, setFieldHourSubTab] = useState<'summary' | 'general' | 'descarga' | 'tp' | 'entrega' | 'dashboard'>('summary');
-  const [fieldHourStats, setFieldHourStats] = useState<{
-    totalStudents: number;
-    pendingReviews: number;
-    completedStudents: number;
-    recentActivity: any[];
-  } | null>(null);
-
   // Modal de confirmación personalizado
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (val: string) => void; type?: 'danger' | 'warning' | 'info'; withInput?: boolean; inputLabel?: string; inputPlaceholder?: string }>({ open: false, title: '', message: '', onConfirm: () => { } });
   const [confirmInput, setConfirmInput] = useState('');
+
+  const isSuperadmin = user?.role === 'superadmin';
+  const hasAnaliticosAccess = !!(user && (isSuperadmin || ((user.permissions?.['analiticos'] || 'none') !== 'none')));
+  const canEditAnaliticos = !!(user && (isSuperadmin || user.permissions?.['analiticos'] === 'editor'));
+  const canManageUsers = !!isSuperadmin;
+  const canAssignSuperadmin = !!(editingUser?.role === 'superadmin' || newUserEmail.trim().toLowerCase() === 'admin@maradonamenotti.com.ar');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
+  const [legajoDirty, setLegajoDirty] = useState(false);
   const [editingDatos, setEditingDatos] = useState(false);
   const [editDni, setEditDni] = useState('');
   const [editNombre, setEditNombre] = useState('');
@@ -151,19 +142,47 @@ function AppContent() {
   const [newMateria, setNewMateria] = useState('');
   const [newNota, setNewNota] = useState('');
 
-  const isAnaliticoCompleto = (student: StudentData) => {
-    if (!student) return false;
-    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION') return true;
+  const getAnaliticoErrors = (student: StudentData | null): string[] => {
+    if (!student) return ['No hay datos del alumno'];
+    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION') return [];
+    
     const required = getSubjectsByLicencia(student.licencia || '');
-    if (required.length === 0) return false;
+    if (required.length === 0) return ['No se reconoce el plan de estudios para esta licencia.'];
 
     const normalize = (s: string) => s.toUpperCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
+    const errors: string[] = [];
 
-    return required.every(sub => {
+    required.forEach(sub => {
       const normSub = normalize(sub);
-      return student.notas?.some(n => normalize(n.materia) === normSub && n.nota > 0);
+      const grade = student.notas?.find(n => normalize(n.materia) === normSub);
+      if (!grade) {
+        errors.push(`Falta: ${sub}`);
+      } else if (grade.nota < 6) {
+        errors.push(`Insuficiente: ${sub} (Nota ${grade.nota})`);
+      }
     });
+
+    return errors;
   };
+
+  const isAnaliticoCompleto = (student: StudentData | null) => {
+    return getAnaliticoErrors(student).length === 0;
+  };
+
+  const getLegajoPendings = (student: StudentData | null) => {
+    if (!student) return ['No hay alumno seleccionado'];
+
+    const pending: string[] = [];
+    const pagosOk = student.estado_analitico === 'emitido' || !!student.pagos_ok;
+    const documentacionOk = student.estado_analitico === 'emitido' || !!student.documentacion_ok;
+    if (!pagosOk) pending.push('Falta validar pagos');
+    if (!documentacionOk) pending.push('Falta validar documentacion');
+    if (!student.fecha_fin_cursada) pending.push('Falta cargar fecha de fin de cursada');
+    if (!isAnaliticoCompleto(student)) pending.push('Faltan notas o hay materias con nota menor a 6');
+    return pending;
+  };
+
+  const isReadyToEmitAnalitico = (student: StudentData | null) => getLegajoPendings(student).length === 0;
 
   // Mapa de notas pendientes de guardar (materia -> valor editado)
   const [pendingNotas, setPendingNotas] = useState<Record<string, string>>({});
@@ -193,20 +212,12 @@ function AppContent() {
         const parsed = JSON.parse(saved);
         setUser(parsed);
         
-        const hasHorasCampo = parsed.role === 'admin' || (parsed.permissions && parsed.permissions['horas-campo'] && parsed.permissions['horas-campo'] !== 'none');
-        const hasAnaliticos = parsed.role === 'admin' || (parsed.permissions && parsed.permissions['analiticos'] && parsed.permissions['analiticos'] !== 'none');
+        const isParsedSuperadmin = parsed.role === 'superadmin';
+        const hasAnaliticos = isParsedSuperadmin || (parsed.permissions && parsed.permissions['analiticos'] && parsed.permissions['analiticos'] !== 'none');
 
-        if (parsed.role === 'student' || (hasHorasCampo && !hasAnaliticos)) {
-          setActiveTab('horas-campo');
-          if (parsed.role === 'student' || (parsed.permissions && parsed.permissions['horas-campo'] === 'admin')) {
-            setFieldHourSubTab(parsed.role === 'student' ? 'summary' : 'dashboard');
-          } else {
-            setFieldHourSubTab('summary');
-          }
-        } else if (parsed.role !== 'admin' && hasAnaliticos) {
+        if (!isParsedSuperadmin && hasAnaliticos) {
           setActiveTab('alumnos');
-        } else if (parsed.role === 'admin') {
-          // Keep default or set to dashboard
+        } else if (isParsedSuperadmin) {
           setActiveTab('dashboard');
         }
         fetchStudents();
@@ -216,36 +227,6 @@ function AppContent() {
       }
     }
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'horas-campo') {
-      fetchEntregas();
-
-      const isFieldHourAdmin = user?.role === 'admin' || user?.permissions?.['horas-campo'] === 'admin';
-      if (isFieldHourAdmin) {
-        fetchFieldHourStats();
-      }
-    }
-  }, [activeTab, user]);
-
-  const fetchFieldHourStats = async () => {
-    try {
-      console.log('Fetching Horas de Campo stats...');
-      const res = await fetch(`${API_URL}/api/horas-campo/admin/stats`);
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      console.log('Stats received:', data);
-      if (data.success) {
-        setFieldHourStats(data.data);
-      } else {
-        console.error('API Error:', data.error);
-        toast.error('No se pudieron cargar las estadísticas');
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      toast.error('Error de conexión con el servidor (Estadísticas)');
-    }
-  };
 
 
   useEffect(() => {
@@ -259,7 +240,7 @@ function AppContent() {
     loadStudentDetail(id);
     const interval = setInterval(() => loadStudentDetail(id), 5000);
     return () => clearInterval(interval);
-  }, [selectedStudent?.id]);
+  }, [selectedStudent?.id, legajoDirty]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -287,23 +268,12 @@ function AppContent() {
       setUser(userData);
       localStorage.setItem('mm-user', JSON.stringify(userData));
       
-      const hasHorasCampo = data.role === 'admin' || (data.permissions && data.permissions['horas-campo'] && data.permissions['horas-campo'] !== 'none');
-      const hasAnaliticos = data.role === 'admin' || (data.permissions && data.permissions['analiticos'] && data.permissions['analiticos'] !== 'none');
+      const isDataSuperadmin = data.role === 'superadmin';
+      const hasAnaliticos = isDataSuperadmin || (data.permissions && data.permissions['analiticos'] && data.permissions['analiticos'] !== 'none');
 
-      if (data.role === 'student' || (hasHorasCampo && !hasAnaliticos)) {
-        setActiveTab('horas-campo');
-        if (data.role === 'student' || (data.permissions && data.permissions['horas-campo'] === 'admin')) {
-          setFieldHourSubTab(data.role === 'student' ? 'summary' : 'dashboard');
-          if (data.role !== 'student') fetchFieldHourStats();
-        } else {
-          setFieldHourSubTab('summary');
-        }
-      } else if (data.role !== 'admin' && hasAnaliticos) {
+      if (!isDataSuperadmin && hasAnaliticos) {
         setActiveTab('alumnos');
-      } else if (data.role === 'admin') {
-        setActiveTab('dashboard');
       } else {
-        // Fallback for users with no permissions
         setActiveTab('dashboard');
       }
       setError('');
@@ -332,7 +302,16 @@ function AppContent() {
       const res = await fetch(`${API_URL}/api/students/${id}`);
       const data = await res.json();
       if (data && data.data) {
-        setSelectedStudent(data.data);
+        setSelectedStudent(prev => {
+          if (legajoDirty && prev && prev.id === data.data.id && data.data.estado_analitico !== 'emitido') {
+            return {
+              ...data.data,
+              pagos_ok: prev.pagos_ok,
+              documentacion_ok: prev.documentacion_ok
+            };
+          }
+          return data.data;
+        });
       }
     } catch (err) {
       console.warn('No se pudo cargar el detalle del alumno');
@@ -340,65 +319,6 @@ function AppContent() {
   };
 
   const getUserQuery = () => `user=${encodeURIComponent(user?.email || user?.documento || 'Sistema')}&nombre=${encodeURIComponent(user?.name || '')}`;
-
-  const fetchEntregas = async () => {
-    if (!user) return;
-    try {
-      const url = user.role === 'student' 
-        ? `${API_URL}/api/horas-campo/mis-entregas?studentId=${user.id}`
-        : `${API_URL}/api/horas-campo/admin/todas`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setEntregas(data.data || []);
-    } catch (err) {
-      console.warn('Error fetching entregas');
-    }
-  };
-
-
-
-  const handleUploadFieldHour = async (file: File, docType: string) => {
-    if (!user) return;
-    setUploadingDoc(docType);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('studentId', user.id);
-    formData.append('documentType', docType);
-
-    try {
-      const res = await fetch(`${API_URL}/api/horas-campo/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      if (res.ok) {
-        toast.success('Archivo subido correctamente');
-        fetchEntregas();
-      } else {
-        const d = await res.json();
-        toast.error(d.error || 'Error al subir');
-      }
-    } catch (err) {
-      toast.error('Error de conexión');
-    } finally {
-      setUploadingDoc(null);
-    }
-  };
-
-  const handleUpdateEntregaEstado = async (id: string, status: string, observations?: string) => {
-    try {
-      const res = await fetch(`${API_URL}/api/horas-campo/${id}/estado`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, observations, user: user?.email })
-      });
-      if (res.ok) {
-        toast.success(`Estado actualizado a ${status}`);
-        fetchEntregas();
-      }
-    } catch (err) {
-      toast.error('Error al actualizar estado');
-    }
-  };
 
   const fetchAppUsers = async () => {
     try {
@@ -413,6 +333,11 @@ function AppContent() {
   const handleCreateUser = async () => {
     if (!newUserEmail || !newUserNombre || (!editingUser && !newUserPassword)) {
       toast.error('Completar todos los campos');
+      return;
+    }
+
+    if (newUserRole === 'superadmin' && newUserEmail.trim().toLowerCase() !== 'admin@maradonamenotti.com.ar') {
+      toast.error('El unico superadmin permitido es admin@maradonamenotti.com.ar');
       return;
     }
 
@@ -444,7 +369,7 @@ function AppContent() {
     setNewUserNombre('');
     setNewUserPassword('');
     setNewUserRole('editor');
-    setNewUserPermissions({ 'analiticos': 'none', 'horas-campo': 'none' });
+    setNewUserPermissions({ 'analiticos': 'none' });
     await fetchAppUsers();
   };
 
@@ -455,6 +380,7 @@ function AppContent() {
   };
 
   const closeStudentModal = () => {
+    setLegajoDirty(false);
     setSelectedStudent(null);
     setEditingDatos(false);
     setShowAddNota(false);
@@ -778,6 +704,11 @@ function AppContent() {
       }
     }
 
+    if (nuevoEstado === 'emitido' && selectedStudent && !isReadyToEmitAnalitico(selectedStudent)) {
+      toast.error('El alumno no cumple los requisitos del legajo para emitir el analitico.');
+      return;
+    }
+
     const executeToggle = async (motivoAdicional = '') => {
       try {
         const res = await fetch(`${API_URL}/api/students/${id}/estado?${getUserQuery()}`, {
@@ -790,7 +721,12 @@ function AppContent() {
 
         await fetchStudents();
         if (selectedStudent?.id === id) {
-          setSelectedStudent(prev => prev ? ({ ...prev, estado_analitico: data.estado }) : null);
+          setSelectedStudent(prev => prev ? ({
+            ...prev,
+            estado_analitico: data.estado,
+            pagos_ok: data.estado === 'emitido' ? true : prev.pagos_ok,
+            documentacion_ok: data.estado === 'emitido' ? true : prev.documentacion_ok
+          }) : null);
           loadStudentDetail(id);
         }
         toast.success(nuevoEstado === 'emitido' ? '¡Analítico Emitido!' : 'Revertido a Borrador');
@@ -836,6 +772,29 @@ function AppContent() {
     } catch (err) {
       console.error(err);
       toast.error('Error al guardar fechas');
+    }
+  };
+
+  const saveLegajo = async () => {
+    if (!selectedStudent?.id) return;
+    try {
+      const res = await fetch(`${API_URL}/api/students/${selectedStudent.id}/legajo?${getUserQuery()}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pagos_ok: !!selectedStudent.pagos_ok,
+          documentacion_ok: !!selectedStudent.documentacion_ok
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error actualizando legajo');
+      toast.success('Legajo actualizado');
+      setLegajoDirty(false);
+      await fetchStudents();
+      loadStudentDetail(selectedStudent.id);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Error actualizando legajo');
     }
   };
 
@@ -906,7 +865,21 @@ function AppContent() {
   const downloadPDF = (student: StudentData) => {
     if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes generar PDFs.'); return; }
-    if (!isAnaliticoCompleto(student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
+    
+    const errors = getAnaliticoErrors(student);
+    if (errors.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-bold">Analítico incompleto/insuficiente:</p>
+          <ul className="text-xs list-disc pl-4 mt-1">
+            {errors.slice(0, 3).map((e, idx) => <li key={idx}>{e}</li>)}
+            {errors.length > 3 && <li>Y {errors.length - 3} materias más...</li>}
+          </ul>
+        </div>
+      );
+      return; 
+    }
+
     window.open(`${API_URL}/api/students/${student.id}/certificate`, '_blank');
   };
 
@@ -927,31 +900,48 @@ function AppContent() {
     }
 
     // 1. Descargar Analítico
-    downloadPDF(student);
-    // setTimeout(() => downloadDiploma(student), 800); // DESACTIVADO TEMPORALMENTE
-
-    // 2. Marcar como Emitido si todavía no lo estaba
-    if (student.estado_analitico !== 'emitido') {
-      if (!isAnaliticoCompleto(student)) {
-        toast.error('⚠️ Generado: Faltan notas obligatorias.');
-      }
-      try {
-        const res = await fetch(
-          `${API_URL}/api/students/${student.id}/estado?${getUserQuery()}`,
-          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'emitido', motivo: 'Generado desde el sistema' }) }
-        );
-        const data = await res.json();
-        await fetchStudents();
-        setSelectedStudent(prev => prev ? ({ ...prev, estado_analitico: data.estado }) : null);
-        if (student.id) loadStudentDetail(student.id);
-      } catch (err) { console.error('No se pudo marcar como Emitido:', err); }
+    // 1. Validar si se puede emitir
+    const errors = getAnaliticoErrors(student);
+    if (errors.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-bold">No se puede emitir:</p>
+          <ul className="text-xs list-disc pl-4 mt-1">
+            {errors.slice(0, 3).map((e, idx) => <li key={idx}>{e}</li>)}
+            {errors.length > 3 && <li>Y {errors.length - 3} materias más...</li>}
+          </ul>
+        </div>
+      );
+      return; 
     }
+
+    // Generar PDF
+    downloadPDF(student);
+    try {
+      const res = await fetch(
+        `${API_URL}/api/students/${student.id}/estado?${getUserQuery()}`,
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'emitido', motivo: 'Generado desde el sistema' }) }
+      );
+      const data = await res.json();
+      await fetchStudents();
+      setSelectedStudent(prev => prev ? ({
+        ...prev,
+        estado_analitico: data.estado,
+        pagos_ok: true,
+        documentacion_ok: true
+      }) : null);
+      if (student.id) loadStudentDetail(student.id);
+    } catch (err) { console.error('No se pudo marcar como Emitido:', err); }
   };
 
   const exportToExcel = () => {
     const dataToExport = filteredStudents.map(student => ({
+      EstadoNotas: (!student.notas || student.notas.length === 0)
+        ? 'Esperando Notas'
+        : (isAnaliticoCompleto(student) ? 'Completo' : 'Faltan Notas'),
       ID: student.dni,
       Nombre: student.nombre,
+      Apellido: student.apellido || '',
       Email: student.email || '',
       'Licencia/Carrera': student.licencia || '',
       Comision: student.comision || '',
@@ -1218,12 +1208,12 @@ function AppContent() {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Padron de Alumnos y Analiticos</h2>
-          <p className="text-slate-500 text-sm">Sincronice el padron e importe notas para generar certificados.</p>
+          <h2 className="text-xl font-bold text-slate-900">Alumnos</h2>
+          <p className="text-slate-500 text-sm">Aca se gestionan todos los alumnos de Titulos: los sincronizados desde QUINTTOS y los creados manualmente.</p>
         </div>
 
         <div className="flex items-center justify-end gap-3 flex-wrap">
-          {user.role !== 'viewer' && (
+          {canEditAnaliticos && (
             <button
               onClick={() => setNewStudentModal(true)}
               disabled={isUploading}
@@ -1234,27 +1224,31 @@ function AppContent() {
             </button>
           )}
 
-          {user.role === 'admin' && (
+          {(isSuperadmin || canEditAnaliticos) && (
             <>
-              <button
-                onClick={handleResetDatabase}
-                disabled={isUploading}
-                className={`flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title="Borrar TODOS los alumnos y notas (Reset Total)"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Reiniciar BD</span>
-              </button>
-              {selectedStudents.length > 0 && (
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={isUploading}
-                  className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title="Eliminar alumnos seleccionados"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Eliminar {selectedStudents.length}</span>
-                </button>
+              {isSuperadmin && (
+                <>
+                  <button
+                    onClick={handleResetDatabase}
+                    disabled={isUploading}
+                    className={`flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Borrar TODOS los alumnos y notas (Reset Total)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Reiniciar BD</span>
+                  </button>
+                  {selectedStudents.length > 0 && (
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={isUploading}
+                      className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title="Eliminar alumnos seleccionados"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Eliminar {selectedStudents.length}</span>
+                    </button>
+                  )}
+                </>
               )}
               <label className={`flex items-center gap-2 px-4 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white font-medium rounded-xl cursor-pointer transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Upload className="w-4 h-4" />
@@ -1354,7 +1348,7 @@ function AppContent() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  onClick={() => { setSelectedStudent(student); if (student.id) loadStudentDetail(student.id); }}
+                  onClick={() => { setLegajoDirty(false); setSelectedStudent(student); if (student.id) loadStudentDetail(student.id); }}
                   className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group min-h-[110px] ${
                     selectedStudents.includes(student.id || '') 
                       ? 'bg-[#0ffff4]/15 border-[#00968f] shadow-md ring-1 ring-[#00968f]' 
@@ -1414,7 +1408,7 @@ function AppContent() {
 
                     {/* Quick actions row */}
                     <div className="flex items-center gap-1 border-l pl-3 border-slate-100" onClick={(e) => e.stopPropagation()}>
-                      {user.role === 'admin' && (
+                      {isSuperadmin && (
                         <button
                           onClick={() => handleDelete(student.id as any)}
                           className="p-2 text-red-400 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
@@ -1579,13 +1573,15 @@ function AppContent() {
                 <div className="flex-1">
                   {!editingDatos ? (
                     <>
-                      <h2 className="text-2xl font-black text-slate-900">{selectedStudent.nombre}</h2>
+                      <h2 className="text-2xl font-black text-slate-900">
+                        {[selectedStudent.nombre, selectedStudent.apellido].filter(Boolean).join(' ').trim()}
+                      </h2>
                       <div className="flex flex-wrap items-center gap-3 mt-2 text-slate-500 text-sm font-medium">
                         <span className="bg-white border border-slate-200 px-3 py-1 rounded shadow-sm">ID: {selectedStudent.dni}</span>
                         {selectedStudent.email && (
                           <span className="bg-white border border-slate-200 px-3 py-1 rounded shadow-sm">Email: {selectedStudent.email}</span>
                         )}
-                        {(user?.role === 'admin' || user?.role === 'editor') && (
+                        {canEditAnaliticos && (
                           <button
                             onClick={startEditDatos}
                             className="text-[#00968f] hover:text-[#002d2b] text-xs font-bold border border-[#0ffff4]/40 bg-[#0ffff4]/15 px-2 py-0.5 rounded transition-colors"
@@ -1662,7 +1658,93 @@ function AppContent() {
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-8">
+                  <div className="xl:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                      <div>
+                        <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Legajo del Alumno</p>
+                        <h3 className="text-lg font-bold text-slate-900 mt-1">Estado para emitir analitico</h3>
+                        <p className="text-sm text-slate-500 mt-1">Pagos y documentacion se validan manualmente. Fecha de fin de cursada y notas se controlan automaticamente.</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isReadyToEmitAnalitico(selectedStudent) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                        {isReadyToEmitAnalitico(selectedStudent) ? 'Listo para emitir' : 'Pendiente'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
+                      <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">Pagos OK</p>
+                          <p className="text-xs text-slate-500">Validacion manual desde Titulos</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={selectedStudent.estado_analitico === 'emitido' || !!selectedStudent.pagos_ok}
+                          onChange={(e) => {
+                            setLegajoDirty(true);
+                            setSelectedStudent(prev => prev ? ({ ...prev, pagos_ok: e.target.checked }) : prev);
+                          }}
+                          disabled={!canEditAnaliticos || selectedStudent.estado_analitico === 'emitido'}
+                          className="h-5 w-5 accent-[#00968f]"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">Documentacion OK</p>
+                          <p className="text-xs text-slate-500">Validacion manual desde Titulos</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={selectedStudent.estado_analitico === 'emitido' || !!selectedStudent.documentacion_ok}
+                          onChange={(e) => {
+                            setLegajoDirty(true);
+                            setSelectedStudent(prev => prev ? ({ ...prev, documentacion_ok: e.target.checked }) : prev);
+                          }}
+                          disabled={!canEditAnaliticos || selectedStudent.estado_analitico === 'emitido'}
+                          className="h-5 w-5 accent-[#00968f]"
+                        />
+                      </label>
+
+                      <div className={`rounded-xl border px-4 py-3 ${selectedStudent.fecha_fin_cursada ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                        <p className="text-sm font-bold text-slate-800">Fin de cursada</p>
+                        <p className={`text-xs mt-1 font-bold ${selectedStudent.fecha_fin_cursada ? 'text-emerald-700' : 'text-amber-800'}`}>
+                          {selectedStudent.fecha_fin_cursada ? `Fecha cargada: ${selectedStudent.fecha_fin_cursada}` : 'Pendiente de carga'}
+                        </p>
+                      </div>
+
+                      <div className={`rounded-xl border px-4 py-3 ${isAnaliticoCompleto(selectedStudent) ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                        <p className="text-sm font-bold text-slate-800">Notas analitico</p>
+                        <p className={`text-xs mt-1 font-bold ${isAnaliticoCompleto(selectedStudent) ? 'text-emerald-700' : 'text-amber-800'}`}>
+                          {isAnaliticoCompleto(selectedStudent) ? 'OK' : 'Pendiente o incompleto'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {!isReadyToEmitAnalitico(selectedStudent) && (
+                      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-xs font-black uppercase tracking-widest text-amber-700">Pendientes detectados</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {getLegajoPendings(selectedStudent).map((pending) => (
+                            <span key={pending} className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white text-amber-800 border border-amber-200">
+                              {pending}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {canEditAnaliticos && (
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          onClick={saveLegajo}
+                          className="bg-[#002d2b] hover:bg-[#00968f] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+                        >
+                          Guardar Legajo
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="bg-[#0ffff4]/12 p-4 border border-[#0ffff4]/35 rounded-2xl">
                     <p className="text-[11px] font-black text-[#00968f] uppercase tracking-widest">Licencia / Carrera</p>
                     <p className="font-bold text-slate-800 mt-1 text-base">{selectedStudent.licencia || 'NO ASIGNADA'}</p>
@@ -1690,7 +1772,7 @@ function AppContent() {
 
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-slate-900">Materias Aprobadas ({selectedStudent.notas?.length || 0})</h3>
-                  {(user?.role === 'admin' || user?.role === 'editor') && (
+                  {canEditAnaliticos && (
                     <button
                       onClick={() => setShowAddNota(prev => !prev)}
                       className="text-xs font-bold bg-[#002d2b] hover:bg-[#00968f] text-white px-3 py-1.5 rounded-lg transition-colors"
@@ -1787,7 +1869,7 @@ function AppContent() {
                           <div key={i} className={`flex justify-between items-center px-4 py-2.5 border-b border-slate-50 last:border-0 transition-colors ${tiene && !hasPending ? 'bg-white' : hasPending ? 'bg-yellow-50' : 'bg-amber-50'}`}>
                             <span className="font-medium text-slate-700 text-sm flex-1 pr-4">{materia}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                              {(user?.role === 'admin' || user?.role === 'editor') ? (
+                              {canEditAnaliticos ? (
                                 <>
                                   <input
                                     type="number"
@@ -1913,7 +1995,7 @@ function AppContent() {
                   </div>
 
                   <div className="flex items-center gap-2 w-full justify-end flex-wrap mt-2">
-                    {user.role === 'admin' && selectedStudent.estado_analitico === 'emitido' && (
+                    {canEditAnaliticos && selectedStudent.estado_analitico === 'emitido' && (
                       <button
                         onClick={() => handleToggleEstado(selectedStudent.id as any)}
                         className="px-3.5 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all shadow-sm border bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300"
@@ -1923,7 +2005,7 @@ function AppContent() {
                       </button>
                     )}
 
-                    {user.role === 'admin' && selectedStudent.notas && selectedStudent.notas.length > 0 && (
+                    {canEditAnaliticos && selectedStudent.notas && selectedStudent.notas.length > 0 && (
                       <button
                         onClick={() => handleDeleteNotas(selectedStudent.id as any)}
                         className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors border border-transparent hover:border-red-200"
@@ -1934,30 +2016,66 @@ function AppContent() {
                     )}
 
                     {(() => {
-                      const disabled = !selectedStudent || !isAnaliticoCompleto(selectedStudent) || user.role === 'viewer';
-                      const disabledClasses = disabled ? ' opacity-50 cursor-not-allowed' : '';
+                      const errors = getAnaliticoErrors(selectedStudent);
+                      const isComplete = errors.length === 0;
+                      const isLegajoReady = isReadyToEmitAnalitico(selectedStudent);
+                      const isViewer = user.role === 'viewer';
+                      const disabled = isViewer; // Solo deshabilitamos si es viewer. Si es incompleto, dejamos clickear para ver el error (Toast).
+                      const opacityClasses = disabled ? ' opacity-50 cursor-not-allowed' : '';
+                      
+                      const handleDownloadClick = (type: 'preview' | 'emit' | 'diploma') => {
+                        if (type === 'emit' && !isLegajoReady) {
+                          toast.error(
+                            <div>
+                              <p className="font-bold">No se puede emitir el analitico:</p>
+                              <ul className="text-xs list-disc pl-4 mt-1">
+                                {getLegajoPendings(selectedStudent).map((pending: string, idx: number) => <li key={idx}>{pending}</li>)}
+                              </ul>
+                            </div>
+                          );
+                          return;
+                        }
+
+                        if (errors.length > 0) {
+                          toast.error(
+                            <div>
+                              <p className="font-bold">No se puede emitir {type === 'diploma' ? 'el diploma' : 'el analítico'}:</p>
+                              <ul className="text-xs list-disc pl-4 mt-1">
+                                {errors.slice(0, 3).map((err: string, idx: number) => <li key={idx}>{err}</li>)}
+                                {errors.length > 3 && <li>Y {errors.length - 3} más...</li>}
+                              </ul>
+                            </div>
+                          );
+                          return;
+                        }
+
+                        if (type === 'preview') downloadPDF(selectedStudent);
+                        else if (type === 'emit') downloadPDFAndEmit(selectedStudent);
+                        else if (type === 'diploma') setDiplomaModal({ isOpen: true, student: selectedStudent });
+                      };
+
                       return (
                         <>
                           <button
-                            onClick={() => !disabled && downloadPDF(selectedStudent)}
+                            onClick={() => !disabled && handleDownloadClick('preview')}
                             disabled={disabled}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all border border-[#0ffff4]/40 bg-[#0ffff4]/10 hover:bg-[#0ffff4]/20 text-[#002d2b]${disabledClasses}`}
-                            title="Abre el PDF para verlo, sin marcarlo como Emitido"
+                            className={`px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all border border-[#0ffff4]/40 bg-[#0ffff4]/10 hover:bg-[#0ffff4]/20 text-[#002d2b]${opacityClasses} ${!isComplete ? 'grayscale-[0.5]' : ''}`}
+                            title={isComplete ? "Vista previa del PDF" : "Faltan notas o hay notas menores a 6"}
                           >
                             <Download className="w-4 h-4" /> Vista Previa
                           </button>
                           <button
-                            onClick={() => !disabled && setDiplomaModal({ isOpen: true, student: selectedStudent })}
+                            onClick={() => !disabled && handleDownloadClick('diploma')}
                             disabled={disabled}
-                            className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-all${disabledClasses}`}
+                            className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-all${opacityClasses} ${!isComplete ? 'grayscale-[0.5]' : ''}`}
                           >
                             <School className="w-5 h-5" />
                             Generar Diploma
                           </button>
                           <button
-                            onClick={() => !disabled && downloadPDFAndEmit(selectedStudent)}
+                            onClick={() => !disabled && handleDownloadClick('emit')}
                             disabled={disabled}
-                            className={`flex items-center justify-center gap-2 px-4 py-2 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-lg text-sm font-bold transition-all shadow-md shadow-[#002d2b]/20${disabledClasses}`}
+                            className={`flex items-center justify-center gap-2 px-4 py-2 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-lg text-sm font-bold transition-all shadow-md shadow-[#002d2b]/20${opacityClasses} ${!isLegajoReady ? 'grayscale-[0.5]' : ''}`}
                             title="Genera el PDF y marca el analítico como Emitido"
                           >
                             <Download className="w-5 h-5" />
@@ -1978,536 +2096,6 @@ function AppContent() {
 
 
 
-  const renderFieldHourDashboard = () => {
-    if (!fieldHourStats) return (
-      <div className="flex flex-col items-center justify-center p-12 text-slate-400">
-        <RefreshCw className="w-8 h-8 animate-spin mb-4" />
-        <p className="font-bold">Cargando estadísticas...</p>
-      </div>
-    );
-
-    const stats = [
-      { 
-        title: 'Total Alumnos', 
-        value: fieldHourStats.totalStudents, 
-        icon: Users, 
-        color: 'bg-indigo-50 text-indigo-600',
-        desc: 'Alumnos en el padrón'
-      },
-      { 
-        title: 'Pendientes de Revisión', 
-        value: fieldHourStats.pendingReviews, 
-        icon: Clock, 
-        color: 'bg-amber-50 text-amber-600',
-        desc: 'Documentos por aprobar'
-      },
-      { 
-        title: 'Trámites Completados', 
-        value: fieldHourStats.completedStudents, 
-        icon: CheckCircle2, 
-        color: 'bg-emerald-50 text-emerald-600',
-        desc: '4/4 documentos aprobados'
-      }
-    ];
-
-    return (
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-10">
-        <header>
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Inteligente</h2>
-          <p className="text-slate-500 font-medium">Resumen general de gestión de Horas de Campo.</p>
-        </header>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {stats.map((s, i) => (
-            <div key={i} className="bg-white p-6 rounded-[28px] border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center gap-5">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${s.color}`}>
-                <s.icon className="w-7 h-7" />
-              </div>
-              <div>
-                <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{s.title}</p>
-                <h3 className="text-2xl font-black text-slate-800">{s.value}</h3>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5">{s.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent Activity */}
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold text-slate-800">Actividad Reciente</h3>
-          <div className="bg-white rounded-[28px] border border-slate-200 shadow-sm overflow-hidden">
-            <div className="divide-y divide-slate-50">
-              {fieldHourStats.recentActivity.map((e, i) => (
-                <div key={i} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{e.documentType}</p>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        Entregado por <span className="text-slate-700 font-bold">{e.student ? `${e.student.nombre} ${e.student.apellido}` : 'Alumno desconocido'}</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                      e.status === 'Aprobado' ? 'bg-emerald-50 text-emerald-600' : 
-                      e.status === 'Reentregar' ? 'bg-rose-50 text-rose-600' : 
-                      'bg-amber-50 text-amber-600'
-                    }`}>
-                    </span>
-                    <p className="text-[9px] text-slate-400 mt-1">{new Date(e.uploadDate).toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderHorasCampo = () => {
-    const isFieldHourAdmin = user?.role === 'admin' || user?.permissions?.['horas-campo'] === 'admin';
-    const getSuffix = (lic: string) => {
-      const l = lic.toUpperCase();
-      if (l.includes('PRO')) return 'PRO';
-      if (l.includes('CB')) return 'CB';
-      if (l.includes('A')) return 'A';
-      if (l.includes('TD1')) return 'TD1';
-      if (l.includes('TD2')) return 'TD2';
-      return '';
-    };
-
-    // Si el admin está en el subtab dashboard, lo mostramos
-    if (isFieldHourAdmin && fieldHourSubTab === 'dashboard') {
-      return renderFieldHourDashboard();
-    }
-
-    const userBaseLic = user?.licencia ? getSuffix(user.licencia) : '';
-      
-      const licenses = [
-        { id: 'CB', name: 'Licencia CB', color: 'slate' },
-        { id: 'A', name: 'Licencia A', color: 'emerald' },
-        { id: 'PRO', name: 'Licencia PRO', color: 'amber' },
-        { id: 'TD1', name: 'TD1', color: 'indigo' },
-        { id: 'TD2', name: 'TD2', color: 'rose' }
-      ];
-
-      const docTypes = (suffix: string) => [
-        `PLANILLA DE ASISTENCIA A CLUBES ${suffix}`,
-        `CARTA DE HORAS PRESENCIALES EN CAMPO/PEDAGÓGICAS ${suffix}`,
-        `CARTA DE HORAS PROFESIONALIZANTES ${suffix}`,
-        "TRABAJO PRÁCTICO"
-      ];
-
-      const templatesToDownload = [
-        { name: 'PLANILLA DE ASISTENCIA A CLUBES', suffix: userBaseLic },
-        { name: 'CARTA DE HORAS PRESENCIALES EN CAMPO/PEDAGÓGICAS', suffix: userBaseLic },
-        { name: 'CARTA DE HORAS PROFESIONALIZANTES', suffix: userBaseLic }
-      ];
-
-      if (user?.role === 'student' || !isFieldHourAdmin) {
-        return (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8 pb-12">
-          <header className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Horas de Campo</h2>
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-[#0ffff4]/20 text-[#002d2b] rounded-full text-[10px] font-black uppercase tracking-widest border border-[#0ffff4]/40">
-                    ID Alumno: {user.documento || user.id}
-                  </span>
-                  {user.licencia && (
-                    <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                      {user.licencia}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </header>
-
-          {fieldHourSubTab === 'summary' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-10">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {docTypes(userBaseLic).map((type, i) => {
-                  const entrega = entregas.find(e => e.documentType === type);
-                  const isAproved = entrega?.status === 'Aprobado';
-                  return (
-                    <div key={i} className={`p-5 rounded-[24px] border ${isAproved ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'} shadow-sm flex flex-col items-center text-center gap-3`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isAproved ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-300'}`}>
-                        {isAproved ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
-                      </div>
-                      <p className="text-[10px] font-bold text-slate-800 uppercase leading-tight">{type}</p>
-                      <span className={`text-[9px] font-black uppercase tracking-wider ${isAproved ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        {isAproved ? 'Completado' : 'Pendiente'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="bg-[#002d2b] rounded-[32px] p-8 text-white relative overflow-hidden shadow-xl border border-white/5">
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                  <div className="space-y-4 text-center md:text-left">
-                    <h3 className="text-2xl font-black">Tu Progreso General</h3>
-                    <p className="text-white/60 text-sm max-w-sm">Para completar tus horas de campo debes entregar las 4 planillas obligatorias firmadas y selladas.</p>
-                    <div className="flex items-center gap-4 justify-center md:justify-start">
-                      <div className="px-5 py-2 bg-white/10 rounded-2xl border border-white/10 text-xl font-black">
-                        {entregas.filter(e => e.status === 'Aprobado').length} / 4
-                      </div>
-                      <span className="text-xs font-bold text-[#0ffff4] uppercase tracking-widest">Documentos Aprobados</span>
-                    </div>
-                  </div>
-                  <div className="w-40 h-40 relative flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="80" cy="80" r="70" fill="transparent" stroke="currentColor" strokeWidth="12" className="text-white/10" />
-                      <circle cx="80" cy="80" r="70" fill="transparent" stroke="currentColor" strokeWidth="12" strokeDasharray="440" strokeDashoffset={440 - (440 * (entregas.filter(e => e.status === 'Aprobado').length / 4))} className="text-[#0ffff4] transition-all duration-1000" strokeLinecap="round" />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                      <span className="text-3xl font-black">{Math.round((entregas.filter(e => e.status === 'Aprobado').length / 4) * 100)}%</span>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-[#0ffff4]">Total</span>
-                    </div>
-                  </div>
-                </div>
-                {/* Decoration */}
-                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-[#0ffff4]/5 rounded-full blur-3xl"></div>
-              </div>
-            </div>
-          )}
-
-          {fieldHourSubTab === 'general' && (
-            <div className="animate-in fade-in zoom-in-95 duration-500 py-12 flex flex-col items-center justify-center text-center bg-white rounded-[32px] border border-slate-100 shadow-sm">
-              <div className="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-3xl flex items-center justify-center mb-6">
-                <Info className="w-10 h-10" />
-              </div>
-              <h3 className="text-2xl font-black text-slate-800 mb-2">Información General</h3>
-              <p className="text-slate-400 font-medium max-w-sm">Aquí encontrarás guías detalladas, noticias y avisos importantes sobre las horas de campo.</p>
-              <div className="mt-8 px-6 py-2 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">
-                Próximamente más información
-              </div>
-            </div>
-          )}
-
-          {fieldHourSubTab === 'descarga' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold text-slate-800">Descarga de Planillas</h3>
-                {userBaseLic && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full">LICENCIA {userBaseLic}</span>}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {templatesToDownload.map((tpl, i) => (
-                  <div key={i} className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 bg-slate-50 rounded-2xl text-slate-400">
-                        <FileDown className="w-6 h-6" />
-                      </div>
-                      <span className="font-bold text-slate-700 text-sm leading-tight">{tpl.name}</span>
-                    </div>
-                    <a 
-                      href={`${API_URL}/api/horas-campo/download-template/${encodeURIComponent(`${tpl.name} ${tpl.suffix}`)}.pdf`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full py-3 bg-[#0ffff4]/10 hover:bg-[#0ffff4]/20 text-[#002d2b] rounded-xl text-sm font-bold text-center transition-all border border-[#0ffff4]/30"
-                    >
-                      Descargar PDF
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {fieldHourSubTab === 'tp' && (
-            <div className="animate-in fade-in slide-in-from-top-4 duration-500 space-y-6">
-              <h3 className="text-xl font-bold text-slate-800">Trabajo Práctico</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all flex flex-col gap-6 relative group">
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-col gap-1">
-                      <h3 className="font-bold text-slate-800 leading-snug pr-8">PLANTILLA DE TRABAJO PRÁCTICO</h3>
-                      <span className="text-[10px] text-slate-400 font-medium italic">Descarga la plantilla para realizar el trabajo.</span>
-                    </div>
-                    <div className="p-3 bg-[#0ffff4]/10 rounded-2xl">
-                      <FileDown className="w-6 h-6 text-[#00968f]" />
-                    </div>
-                  </div>
-                  <a 
-                    href={`${API_URL}/api/horas-campo/download-template/${encodeURIComponent('TRABAJO PRÁCTICO')}.pdf`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-3 bg-[#0ffff4]/10 hover:bg-[#0ffff4]/20 text-[#002d2b] rounded-xl text-sm font-bold text-center transition-all border border-[#0ffff4]/30"
-                  >
-                    Descargar Plantilla TP
-                  </a>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {fieldHourSubTab === 'entrega' && (
-            <div className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
-              {/* License Cards Grid - 5 columns */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                {licenses.map(lic => {
-                  const isEnabled = lic.id === userBaseLic;
-                  return (
-                    <div 
-                      key={lic.id} 
-                      className={`relative p-5 rounded-[24px] border-2 transition-all overflow-hidden ${
-                        isEnabled 
-                          ? 'border-[#00968f] bg-[#0ffff4]/5 shadow-lg ring-1 ring-[#00968f]/20' 
-                          : 'border-slate-100 bg-slate-50 opacity-60'
-                      }`}
-                    >
-                      {!isEnabled && (
-                        <div className="absolute inset-0 bg-slate-200/20 backdrop-blur-[1px] flex items-center justify-center p-4">
-                          <span className="bg-slate-800/80 text-white text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest">Inhabilitado</span>
-                        </div>
-                      )}
-                      <div className="flex flex-col gap-3 relative z-10">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isEnabled ? 'bg-[#0ffff4] text-[#002d2b]' : 'bg-slate-200 text-slate-400'}`}>
-                          <School className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3 className={`font-black text-sm ${isEnabled ? 'text-[#002d2b]' : 'text-slate-400'}`}>{lic.name}</h3>
-                          <p className={`text-[9px] font-bold uppercase tracking-widest ${isEnabled ? 'text-[#00968f]' : 'text-slate-400'}`}>
-                            {isEnabled ? 'Tu Licencia' : 'No corresponde'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Documents Area */}
-              <div className="animate-in fade-in slide-in-from-top-4 duration-700">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px bg-slate-200 flex-1"></div>
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Documentos Obligatorios</h3>
-                  <div className="h-px bg-slate-200 flex-1"></div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {docTypes(userBaseLic).map((type) => {
-                    const entrega = entregas.find(e => e.documentType === type);
-                    const isUploading = uploadingDoc === type;
-
-                    return (
-                      <div key={type} className="bg-white rounded-[24px] border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all flex flex-col justify-between gap-6 overflow-hidden relative group">
-                        <div className="flex items-start justify-between">
-                          <div className="flex flex-col gap-1">
-                            <h3 className="font-bold text-slate-800 leading-snug pr-8">{type}</h3>
-                            {entrega ? (
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                  entrega.status === 'Aprobado' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 
-                                  entrega.status === 'Reentregar' ? 'bg-rose-100 text-rose-700 border border-rose-200' : 
-                                  'bg-amber-100 text-amber-700 border border-amber-200'
-                                }`}>
-                                  {entrega.status}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  {new Date(entrega.uploadDate || entrega.createdAt).toLocaleDateString()}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-[10px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-black uppercase tracking-wider border border-slate-200 mt-1">Pendiente de entrega</span>
-                            )}
-                          </div>
-                          <div className="p-3 bg-slate-50 rounded-2xl group-hover:bg-[#0ffff4]/10 transition-colors">
-                            <FileText className="w-6 h-6 text-slate-400 group-hover:text-[#00968f] transition-colors" />
-                          </div>
-                        </div>
-
-                        {entrega?.observations && (
-                          <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-xs text-rose-800">
-                            <strong>Observaciones:</strong> {entrega.observations}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-3 mt-2">
-                          {entrega?.status === 'Aprobado' ? (
-                            <div className="w-full py-3 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-emerald-100">
-                              <CheckCircle2 className="w-5 h-5" />
-                              Documento Aprobado y Bloqueado
-                            </div>
-                          ) : (
-                            <label className={`w-full relative flex items-center justify-center gap-2 py-3 ${isUploading ? 'bg-slate-400' : 'bg-[#002d2b] hover:bg-[#00968f]'} text-white rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer`}>
-                              {isUploading ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4" />
-                              )}
-                              <span>{entrega ? 'Reemplazar Entrega' : 'Subir Entrega'}</span>
-                              <input 
-                                type="file" 
-                                className="hidden" 
-                                accept=".pdf,image/*" 
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleUploadFieldHour(file, type);
-                                }}
-                                disabled={isUploading}
-                              />
-                            </label>
-                          )}
-                        </div>
-                        
-                        {entrega?.serverPath && (
-                          <a 
-                            href={`${API_URL}/api/horas-campo/download/${entrega.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[10px] text-center text-slate-400 hover:text-[#00968f] underline font-medium"
-                          >
-                            Ver mi entrega actual
-                          </a>
-                        )}
-                      </div>
-                    );
-                  })}
-                  </div>
-                </div>
-              </div>
-            )}
-        </div>
-      );
-    } // Closes if (user.role === 'student' || admin restricted)
-
-    // VISTA ADMIN (Solo para el rol admin o permiso específico)
-    if (!isFieldHourAdmin) {
-      return (
-        <div className="flex flex-col items-center justify-center p-12 text-center">
-          <div className="bg-amber-50 text-amber-700 p-6 rounded-2xl border border-amber-100 max-w-md">
-            <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-bold mb-2">Acceso Restringido</h3>
-            <p className="text-sm">Esta sección de administración está reservada para el departamento de Horas de Campo.</p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Gestión de Horas de Campo</h2>
-            <p className="text-slate-500 font-medium">Revisión y aprobación de documentos entregados por alumnos.</p>
-          </div>
-          <button 
-            onClick={() => setNewStudentModal(true)}
-            className="flex items-center gap-2 px-5 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl text-sm font-bold transition-all shadow-lg hover:-translate-y-0.5 active:scale-95"
-          >
-            <UserPlus className="w-5 h-5" />
-            + Nuevo Alumno
-          </button>
-        </header>
-
-        <div className="bg-white rounded-[28px] border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Alumno</th>
-                  <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Documento</th>
-                  <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Fecha</th>
-                  <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Estado</th>
-                  <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {entregas.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No hay entregas registradas todavía.</td>
-                  </tr>
-                ) : (
-                  entregas.map((e) => (
-                    <tr key={e.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800">{e.student ? `${e.student.nombre} ${e.student.apellido}` : 'Alumno'}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-400 font-medium">PK: {e.student?.documento || e.student?.id}</span>
-                            {/* Alerta inteligente de completitud */}
-                            {entregas.filter(ent => ent.studentId === e.studentId && ent.status === 'Aprobado').length >= 4 && (
-                              <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">
-                                COMPLETO
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-semibold text-slate-600 line-clamp-1" title={e.documentType}>{e.documentType}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs text-slate-500">{new Date(e.uploadDate).toLocaleDateString()}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          e.status === 'Aprobado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                          e.status === 'Reentregar' ? 'bg-rose-50 text-rose-700 border-rose-200' : 
-                          'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                          {e.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <a 
-                            href={`${API_URL}/api/horas-campo/download/${e.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 bg-slate-100 hover:bg-[#0ffff4]/20 text-slate-600 hover:text-[#00968f] rounded-lg transition-all border border-slate-200"
-                            title="Descargar archivo"
-                          >
-                            <Download className="w-4 h-4" />
-                          </a>
-                          <button 
-                            onClick={() => handleUpdateEntregaEstado(e.id, 'Aprobado')}
-                            className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-all border border-emerald-200"
-                            title="Aprobar"
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setConfirmInput('');
-                              setConfirmModal({
-                                open: true,
-                                title: 'Solicitar Nueva Entrega',
-                                message: 'Ingresá las observaciones para el alumno:',
-                                type: 'warning',
-                                withInput: true,
-                                onConfirm: (val) => {
-                                  handleUpdateEntregaEstado(e.id, 'Reentregar', val);
-                                  setConfirmModal(p => ({...p, open: false}));
-                                }
-                              });
-                            }}
-                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all border border-rose-200"
-                            title="Marcar para reentregar"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const renderUsuarios = () => {
     const handleEditClick = (u: any) => {
       setEditingUser(u);
@@ -2515,7 +2103,7 @@ function AppContent() {
       setNewUserEmail(u.email);
       setNewUserPassword(''); // No mostramos el password
       setNewUserRole(u.role);
-      setNewUserPermissions(u.permissions || { 'analiticos': 'none', 'horas-campo': 'none' });
+      setNewUserPermissions(u.permissions || { 'analiticos': 'none' });
     };
 
     const togglePermission = (module: string) => {
@@ -2574,14 +2162,14 @@ function AppContent() {
                 onChange={e => setNewUserRole(e.target.value as any)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00968f] outline-none bg-white"
               >
-                <option value="admin">Superadmin (Acceso Total)</option>
+                {canAssignSuperadmin && <option value="superadmin">Superadmin (Acceso Total)</option>}
                 <option value="editor">Editor (Personalizado)</option>
                 <option value="viewer">Viewer (Solo Lectura)</option>
               </select>
             </div>
           </div>
 
-          {newUserRole !== 'admin' && (
+          {newUserRole !== 'superadmin' && (
             <div className="space-y-4 mb-6">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Permisos por Módulo</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2610,32 +2198,6 @@ function AppContent() {
                     </select>
                   )}
                 </div>
-
-                {/* Modulo Horas de Campo */}
-                <div className={`p-4 rounded-xl border transition-all ${newUserPermissions['horas-campo'] !== 'none' ? 'border-[#0ffff4] bg-[#0ffff4]/5' : 'border-slate-100 bg-slate-50'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <LayoutDashboard className="w-5 h-5 text-slate-400" />
-                      <span className="font-bold text-slate-700">Horas de Campo</span>
-                    </div>
-                    <button 
-                      onClick={() => togglePermission('horas-campo')}
-                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase transition-all ${newUserPermissions['horas-campo'] !== 'none' ? 'bg-[#002d2b] text-white' : 'bg-slate-200 text-slate-500'}`}
-                    >
-                      {newUserPermissions['horas-campo'] !== 'none' ? 'Habilitado' : 'Deshabilitado'}
-                    </button>
-                  </div>
-                  {newUserPermissions['horas-campo'] !== 'none' && (
-                    <select
-                      value={newUserPermissions['horas-campo']}
-                      onChange={e => updateModuleRole('horas-campo', e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-[#00968f]"
-                    >
-                      <option value="viewer">Solo Alumno (Summary)</option>
-                      <option value="admin">Administrador del Módulo</option>
-                    </select>
-                  )}
-                </div>
               </div>
             </div>
           )}
@@ -2649,7 +2211,7 @@ function AppContent() {
                   setNewUserEmail('');
                   setNewUserPassword('');
                   setNewUserRole('editor');
-                  setNewUserPermissions({ 'analiticos': 'none', 'horas-campo': 'none' });
+                  setNewUserPermissions({ 'analiticos': 'none' });
                 }}
                 className="px-6 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all"
               >
@@ -2679,8 +2241,8 @@ function AppContent() {
               {appUsers.map(u => (
                 <div key={u.id} className="flex items-center justify-between px-6 py-5 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-xl ${u.role === 'admin' ? 'bg-[#0ffff4]/20' : 'bg-emerald-100'}`}>
-                      <User className={`w-5 h-5 ${u.role === 'admin' ? 'text-[#002d2b]' : 'text-emerald-700'}`} />
+                    <div className={`p-2 rounded-xl ${u.role === 'superadmin' ? 'bg-[#0ffff4]/20' : 'bg-emerald-100'}`}>
+                      <User className={`w-5 h-5 ${u.role === 'superadmin' ? 'text-[#002d2b]' : 'text-emerald-700'}`} />
                     </div>
                     <div>
                       <p className="font-semibold text-slate-900">{u.nombre}</p>
@@ -2691,15 +2253,12 @@ function AppContent() {
                   <div className="flex items-center gap-6">
                     {/* Resumen de permisos */}
                     <div className="hidden md:flex items-center gap-2">
-                      {u.role === 'admin' ? (
+                      {u.role === 'superadmin' ? (
                         <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded uppercase tracking-widest">Superadmin</span>
                       ) : (
                         <>
                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${u.permissions?.['analiticos'] !== 'none' ? 'bg-[#0ffff4]/10 text-[#002d2b] border-[#0ffff4]/30' : 'bg-slate-100 text-slate-300 border-slate-200'}`}>
                             Analíticos: {u.permissions?.['analiticos'] || 'none'}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${u.permissions?.['horas-campo'] !== 'none' ? 'bg-[#0ffff4]/10 text-[#002d2b] border-[#0ffff4]/30' : 'bg-slate-100 text-slate-300 border-slate-200'}`}>
-                            Horas Campo: {u.permissions?.['horas-campo'] || 'none'}
                           </span>
                         </>
                       )}
@@ -2713,7 +2272,7 @@ function AppContent() {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      {u.role !== 'admin' && (
+                      {u.role !== 'superadmin' && (
                         <button
                           onClick={() => handleDeleteUser(u.id)}
                           className="p-2 text-red-300 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"
@@ -2743,7 +2302,7 @@ function AppContent() {
 
         <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto custom-scrollbar">
           {/* SECCIÓN DASHBOARD */}
-          {(user.role === 'admin' || user.role === 'editor') && user.email !== 'horasdecampo@maradonamenotti.com.ar' && (
+          {(isSuperadmin || user.permissions?.['analiticos'] === 'editor') && (
             <div className="space-y-2">
               <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">General</p>
               <button
@@ -2757,7 +2316,7 @@ function AppContent() {
           )}
 
           {/* SECCIÓN ANALÍTICOS */}
-          {user.role !== 'student' && user.email !== 'horasdecampo@maradonamenotti.com.ar' && (user.role === 'admin' || (user.permissions?.['analiticos'] && user.permissions['analiticos'] !== 'none')) && (
+          {user.role !== 'student' && hasAnaliticosAccess && (
             <div className="space-y-2">
               <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Padrón de Alumnos</p>
               <button
@@ -2765,83 +2324,14 @@ function AppContent() {
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
               >
                 <Users className="w-5 h-5" />
-                Listado de Alumnos
+                Alumnos
               </button>
             </div>
           )}
 
-          {/* SECCIÓN HORAS DE CAMPO */}
-          {(user.role === 'student' || user.email === 'horasdecampo@maradonamenotti.com.ar' || (user.role === 'admin' && user.email !== 'titulos@maradonamenotti.com.ar')) && (
-            <div className="space-y-2">
-              <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Horas de Campo</p>
-              
-              {/* Para ADMINS de Horas de Campo o General */}
-              {(user.role === 'admin' || user.permissions?.['horas-campo'] === 'admin') ? (
-                <div className="space-y-1">
-                  <button
-                    onClick={() => { setActiveTab('horas-campo'); setFieldHourSubTab('dashboard'); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'horas-campo' && fieldHourSubTab === 'dashboard' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
-                  >
-                    <LayoutDashboard className="w-5 h-5" />
-                    Dashboard Inteligente
-                  </button>
-                  <button
-                    onClick={() => { setActiveTab('horas-campo'); setFieldHourSubTab('entrega'); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'horas-campo' && fieldHourSubTab === 'entrega' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
-                  >
-                    <FileText className="w-5 h-5" />
-                    Gestión de Entregas
-                  </button>
-                </div>
-              ) : (
-                /* Para ALUMNOS */
-                <div className="space-y-1">
-                  <button
-                    onClick={() => { setActiveTab('horas-campo'); setFieldHourSubTab('summary'); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'horas-campo' && fieldHourSubTab === 'summary' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
-                  >
-                    <LayoutDashboard className="w-5 h-5" />
-                    Horas de Campo
-                  </button>
-                  {activeTab === 'horas-campo' && (
-                    <div className="pl-4 mt-1 space-y-1">
-                      <button 
-                        onClick={() => setFieldHourSubTab('general')}
-                        className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs transition-all ${fieldHourSubTab === 'general' ? 'text-[#0ffff4] font-bold bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5 font-medium'}`}
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                        Información General
-                      </button>
-                      <button 
-                        onClick={() => setFieldHourSubTab('descarga')}
-                        className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs transition-all ${fieldHourSubTab === 'descarga' ? 'text-[#0ffff4] font-bold bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5 font-medium'}`}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Descargar Planillas
-                      </button>
-                      <button 
-                        onClick={() => setFieldHourSubTab('tp')}
-                        className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs transition-all ${fieldHourSubTab === 'tp' ? 'text-[#0ffff4] font-bold bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5 font-medium'}`}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        Trabajo Práctico
-                      </button>
-                      <button 
-                        onClick={() => setFieldHourSubTab('entrega')}
-                        className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs transition-all ${fieldHourSubTab === 'entrega' ? 'text-[#0ffff4] font-bold bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5 font-medium'}`}
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        Entrega de Planillas
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* SECCIÓN Gestión Usuarios - Al final */}
-          {user.role === 'admin' && user.email !== 'horasdecampo@maradonamenotti.com.ar' && (
+          {canManageUsers && (
             <div className="space-y-2">
               <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Acceso y Seguridad</p>
               <button
@@ -2884,7 +2374,7 @@ function AppContent() {
           <h1 className="text-[#002d2b] text-2xl font-black tracking-tight">
             {activeTab === 'dashboard' ? 'Módulo Analíticos: Panel de Control' : 
              activeTab === 'usuarios' ? 'Gestión de Usuarios' : 
-             activeTab === 'horas-campo' ? `Horas de Campo: ${fieldHourSubTab === 'dashboard' ? 'Dashboard Inteligente' : 'Gestión de Entregas'}` : 'Padrón de Alumnos'}
+             'Padrón de Alumnos'}
           </h1>
         </header>
 
@@ -2892,7 +2382,7 @@ function AppContent() {
           <div className="max-w-7xl mx-auto pb-12">
             {activeTab === 'dashboard' ? renderDashboard() : 
              activeTab === 'usuarios' ? renderUsuarios() : 
-             activeTab === 'horas-campo' ? renderHorasCampo() : renderAlumnos()}
+             renderAlumnos()}
           </div>
         </main>
       </div>
@@ -3093,6 +2583,10 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+
+
+
 
 
 

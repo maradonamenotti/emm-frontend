@@ -21,7 +21,7 @@ const numberToWords = (n: number): string => {
 };
 
 export const LICENCIA_SUBJECTS: Record<string, string[]> = {
-  // Licencia CB — materias exactas del certificado PDF
+  // Licencia CB - materias exactas del certificado PDF
   "C": [
     "METODOLOGÍA DE LA ENSEÑANZA I",
     "TÉCNICA, TÁCTICA Y ESTRATEGIA I",
@@ -100,7 +100,6 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "PSICOLOGÍA I",
     "ÉTICA Y VALORES",
     "HISTORIA DEL FÚTBOL ARGENTINO",
-    "PROMEDIO GENERAL DE PRÁCTICAS",
     "TÉCNICA, TÁCTICA Y ESTRATEGIA III",
     "PLANIFICACIÓN DEL ENTRENAMIENTO II",
     "DESARROLLO DE TALENTOS",
@@ -129,23 +128,30 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "RECURSOS HUMANOS",
     "PROMEDIO GENERAL DE PRÁCTICAS"
   ],
-  "ACTUALIZACION": [
-    // No lleva materias; se usa solo para el diploma del curso de actualización
-  ]
+  "ACTUALIZACION": []
 };
 
 export const getSubjectsByLicencia = (licencia: string): string[] => {
   const lic = (licencia || '').toUpperCase().trim();
   if (!lic) return [];
 
-  if (lic === 'PRO' || lic.includes('PROFESIONAL') || lic.includes('PRO ') || lic.includes('TRAYECTORIA II') || lic.includes('EXTENSA') || lic.includes('TRAYECTORIA DESTACADA II') || lic.includes('TRAYECTORIA DESTACADA 2')) return LICENCIA_SUBJECTS['PRO'];
+  const isTrayectoria1 = lic === 'BA'
+    || lic === 'B Y A'
+    || lic.includes('TD1')
+    || lic.includes('DESTACADA I')
+    || lic.includes('DESTACADA 1')
+    || lic.includes('TRAYECTORIA I')
+    || lic.includes('TRAYECTORIA 1');
+  const isTrayectoria2 = lic.includes('TD2')
+    || lic.includes('DESTACADA II')
+    || lic.includes('DESTACADA 2')
+    || lic.includes('TRAYECTORIA II')
+    || lic.includes('TRAYECTORIA 2');
+
+  if (lic === 'PRO' || lic.includes('PROFESIONAL') || lic.includes('PRO ') || isTrayectoria2) return LICENCIA_SUBJECTS['PRO'];
   if (lic === 'CB' || lic.includes('COMBO') || (lic.includes('C') && lic.includes('B'))) return LICENCIA_SUBJECTS['CB'];
-  if (lic.includes('TD1') || lic.includes('DESTACADA I') || lic.includes('TRAYECTORIA I') || lic.includes('EXTENSA') || lic.includes('TRAYECTORIA DESTACADA I')) {
-    return LICENCIA_SUBJECTS['TD1'];
-  }
-  if (lic.includes('TD2') || lic.includes('DESTACADA II') || lic.includes('TRAYECTORIA II') || lic.includes('EXTENSA') || lic.includes('TRAYECTORIA DESTACADA II')) {
-    return LICENCIA_SUBJECTS['PRO'];
-  }
+  if (isTrayectoria1) return LICENCIA_SUBJECTS['TD1'];
+  if (isTrayectoria2) return LICENCIA_SUBJECTS['PRO'];
   if (lic.includes('ACTUALIZACION')) return LICENCIA_SUBJECTS['ACTUALIZACION'];
   if (lic === 'A' || lic.endsWith(' A') || lic.includes(' A ')) return LICENCIA_SUBJECTS['A'];
   if (lic === 'B' || lic.endsWith(' B') || lic.includes(' B ')) return LICENCIA_SUBJECTS['B'];
@@ -158,7 +164,6 @@ export const generateAnaliticoPDF = (student: StudentData) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Logo Placeholder (Simulating the M logo)
   doc.setFillColor(0, 0, 0);
   doc.rect(pageWidth / 2 - 10, 10, 20, 20, "F");
   doc.setTextColor(255, 255, 255);
@@ -170,22 +175,29 @@ export const generateAnaliticoPDF = (student: StudentData) => {
   doc.text("MARADONA", pageWidth / 2, 32, { align: "center" });
   doc.text("MENOTTI", pageWidth / 2, 35, { align: "center" });
 
-  // Title
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.text("CERTIFICADO ANALÍTICO", pageWidth / 2, 45, { align: "center" });
   doc.setLineWidth(0.5);
   doc.line(pageWidth / 2 - 25, 46, pageWidth / 2 + 25, 46);
 
-  // Main Text
   const licenseType = student.licencia.toUpperCase().trim();
+  const isTrayectoria1 = licenseType === 'BA'
+    || licenseType === 'B Y A'
+    || licenseType.includes('TD1')
+    || licenseType.includes('TRAYECTORIA DESTACADA I')
+    || licenseType.includes('TRAYECTORIA DESTACADA 1')
+    || licenseType.includes('TRAYECTORIA I')
+    || licenseType.includes('TRAYECTORIA 1');
+  const isTrayectoria2 = licenseType.includes('TD2')
+    || licenseType.includes('TRAYECTORIA DESTACADA II')
+    || licenseType.includes('TRAYECTORIA DESTACADA 2')
+    || licenseType.includes('TRAYECTORIA II')
+    || licenseType.includes('TRAYECTORIA 2');
+
   let displayLicense = student.licencia.toUpperCase();
-  if (licenseType === 'TD2' || licenseType.includes('TRAYECTORIA DESTACADA II') || licenseType.includes('TRAYECTORIA DESTACADA 2') || licenseType.includes('EXTENSA') || licenseType.includes('TRAYECTORIA II')) {
-    displayLicense = 'PRO';
-  }
-  if (licenseType === 'TD1' || licenseType.includes('TRAYECTORIA DESTACADA I') || licenseType.includes('TRAYECTORIA DESTACADA 1') || licenseType.includes('TRAYECTORIA I')) {
-    displayLicense = 'B Y A';
-  }
+  if (isTrayectoria2) displayLicense = 'PRO';
+  if (isTrayectoria1) displayLicense = 'B Y A';
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
@@ -193,7 +205,6 @@ export const generateAnaliticoPDF = (student: StudentData) => {
   const splitText = doc.splitTextToSize(mainText, pageWidth - 40);
   doc.text(splitText, 20, 55);
 
-  // Table Data Preparation with Grouping
   const body: any[] = [];
 
   const addGroup = (level: string) => {
@@ -214,21 +225,19 @@ export const generateAnaliticoPDF = (student: StudentData) => {
   if (licenseType === "CB" || licenseType.includes('COMBO') || (licenseType.includes('C') && licenseType.includes('B'))) {
     addGroup("C");
     addGroup("B");
-  } else if (licenseType === "BA" || licenseType === "B Y A" || licenseType.includes('TD1') || licenseType.includes("TRAYECTORIA I") || licenseType.includes("TRAYECTORIA DESTACADA I")) {
+  } else if (isTrayectoria1) {
     addGroup("B");
     addGroup("A");
   } else if (licenseType === "A") {
     addGroup("A");
-  } else if (licenseType === "PRO" || licenseType.includes('TD2') || licenseType.includes('EXTENSA') || licenseType.includes("TRAYECTORIA II") || licenseType.includes("TRAYECTORIA DESTACADA II")) {
+  } else if (licenseType === "PRO" || isTrayectoria2) {
     addGroup("PRO");
   } else {
-    // Fallback for other types
     student.notas.forEach(n => {
       body.push([n.materia, n.nota.toString(), numberToWords(n.nota)]);
     });
   }
 
-  // Table
   autoTable(doc, {
     startY: 75,
     head: [
@@ -242,7 +251,7 @@ export const generateAnaliticoPDF = (student: StudentData) => {
         { content: "EN LETRAS", styles: { halign: "center" } }
       ]
     ],
-    body: body,
+    body,
     theme: "grid",
     styles: {
       fontSize: 8,
@@ -261,7 +270,6 @@ export const generateAnaliticoPDF = (student: StudentData) => {
       2: { cellWidth: 40, halign: "center" }
     },
     didDrawPage: (data) => {
-      // Footer of the table
       const finalY = data.cursor?.y || 200;
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
@@ -278,24 +286,20 @@ export const generateAnaliticoPDF = (student: StudentData) => {
 
   const finalY = (doc as any).lastAutoTable.finalY + 20;
 
-  // Final Text
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   const footerText = `En fe de lo cual se expide el presente certificado ORIGINAL sin raspaduras ni enmiendas en la ciudad de Buenos Aires a los ${new Date().getDate()} días del mes de ${new Date().toLocaleString('es-AR', { month: 'long' })} del año ${new Date().getFullYear()}.`;
   const splitFooter = doc.splitTextToSize(footerText, pageWidth - 40);
   doc.text(splitFooter, 20, finalY + 10);
 
-  // Signature
   doc.setFontSize(10);
   doc.text("César Mario Menotti", pageWidth - 60, finalY + 40, { align: "center" });
   doc.text("Vicepresidente", pageWidth - 60, finalY + 45, { align: "center" });
   doc.text("17366697", pageWidth - 60, finalY + 50, { align: "center" });
 
-  // Bottom Info
   doc.setFontSize(8);
   doc.setTextColor(100);
-  doc.text("SAN MARTIN 536 Piso 6 - Ciudad Autónoma de Buenos Aires, República Argentina – Teléfono 1143130221", pageWidth / 2, 285, { align: "center" });
+  doc.text("SAN MARTIN 536 Piso 6 - Ciudad Autónoma de Buenos Aires, República Argentina - Teléfono 1143130221", pageWidth / 2, 285, { align: "center" });
 
   return doc;
 };
-

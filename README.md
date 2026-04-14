@@ -1,73 +1,41 @@
-# React + TypeScript + Vite
+# 🎓 Sistema de Gestión Académica y Analíticos (Frontend)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Una plataforma web de alto rendimiento orientada a la gestión de datos académicos, seguimiento de progreso estudiantil y automatización de certificados oficiales. Diseñada con una estética moderna, fluida y profesional.
 
-Currently, two official plugins are available:
+## 🚀 Características Principales
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+-   **Dashboard Inteligente**: Visualización en tiempo real de estadísticas de alumnos, certificados emitidos y materias pendientes.
+*   **Generador de PDFs Bajo Demanda**: Motor dinámico para la creación de Certificados Analíticos y Diplomas, manejando lógicas complejas de programas (TD1, TD2, PRO, etc.).
+-   **Importador Automático**: Ingesta inteligente de datos desde Excel (Quinttos) con auto-detección de formatos y alineación de columnas.
+-   **UI Premium**: Interfaz basada en *Glassmorphism*, animaciones fluidas con `framer-motion` y modo oscuro/claro balanceado.
+*   **Validación Académica**: Algoritmos de verificación de completitud para asegurar que el alumno posee todas las notas requeridas antes de emitir documentos.
 
-## React Compiler
+## 🛠️ Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+-   **Framework**: React 18 (Vite)
+*   **Lenguaje**: TypeScript
+-   **Estilos**: Vanilla CSS + Tailwind CSS (Optimizado)
+*   **Animaciones**: Framer Motion
+-   **Iconografía**: Lucide React
+*   **Gestión de PDF**: jsPDF / pdf-lib
+-   **Procesamiento de Datos**: XLSX (SheetJS)
+*   **Notificaciones**: React Hot Toast
 
-## Expanding the ESLint configuration
+## 📦 Instalación y Setup
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1.  Clonar el repositorio.
+2.  Instalar dependencias:
+    ```bash
+    npm install
+    ```
+3.  Configurar variables de entorno en `.env`:
+    ```env
+    VITE_API_URL=http://localhost:3000
+    ```
+4.  Iniciar servidor de desarrollo:
+    ```bash
+    npm run dev
+    ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+*Desarrollado para optimizar procesos administrativos en instituciones deportivas y de entrenamiento.*
