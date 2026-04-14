@@ -1342,7 +1342,9 @@ function AppContent() {
           )}
           <AnimatePresence mode="popLayout">
             {filteredStudents.length > 0 ? (
-              filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((student, idx) => (
+              filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((student, idx) => {
+                const hasInsufficientNotes = !!student.notas?.some(n => n.nota > 0 && n.nota < 6);
+                return (
                 <motion.div
                   key={student.dni + idx}
                   initial={{ opacity: 0, y: 10 }}
@@ -1354,6 +1356,8 @@ function AppContent() {
                       ? 'bg-[#0ffff4]/15 border-[#00968f] shadow-md ring-1 ring-[#00968f]' 
                       : student.situacion === 'DUPLICADO'
                         ? 'bg-rose-50 border-rose-300 hover:border-rose-400 hover:shadow-md'
+                        : hasInsufficientNotes
+                          ? 'bg-red-50 border-red-200 hover:border-red-300 hover:shadow-md'
                         : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-[#00968f33]'
                   }`}
                 >
@@ -1371,9 +1375,11 @@ function AppContent() {
                         ? 'bg-[#0ffff4]/30 text-[#002d2b]'
                         : student.situacion === 'DUPLICADO' 
                           ? 'bg-rose-100 group-hover:bg-rose-200' 
+                          : hasInsufficientNotes
+                            ? 'bg-red-100 group-hover:bg-red-200'
                           : 'bg-[#0ffff4]/10 group-hover:bg-[#0ffff4]/20'
                     }`}>
-                      <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : 'text-[#002d2b]'}`} />
+                      <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : hasInsufficientNotes ? 'text-red-700' : 'text-[#002d2b]'}`} />
                     </div>
                     <div className="flex flex-col gap-1">
                       <h3 className="text-lg font-bold text-slate-900 leading-tight">
@@ -1402,6 +1408,11 @@ function AppContent() {
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${isAnaliticoCompleto(student) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
                       {isAnaliticoCompleto(student) ? 'Completo' : 'Incompleto'}
                     </span>
+                    {hasInsufficientNotes && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border bg-red-100 text-red-700 border-red-200">
+                        Nota menor a 6
+                      </span>
+                    )}
                     {(!student.notas || student.notas.length === 0) && (
                       <span className="text-amber-700 font-bold text-xs bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">Esperando Notas</span>
                     )}
@@ -1438,7 +1449,7 @@ function AppContent() {
                     </div>
                   </div>
                 </motion.div>
-              ))
+              )})
             ) : (
               <div className="w-full py-24 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-200 border-dashed">
                 <FileSpreadsheet className="w-16 h-16 text-slate-200 mb-4" />
@@ -1827,6 +1838,7 @@ function AppContent() {
                       {planMaterias.map((materia, i) => {
                         const notaActual = notasMap[stripAccents(materia)] ?? 0;
                         const tiene = notaActual > 0;
+                        const esInsuficiente = notaActual > 0 && notaActual < 6;
                         const pending = pendingNotas[materia];
                         const hasPending = pending !== undefined && parseFloat(pending) !== notaActual;
                         const isSaving = savingNota === materia;
@@ -1879,7 +1891,7 @@ function AppContent() {
                                     value={pending !== undefined ? pending : (notaActual || '')}
                                     onChange={e => setPendingNotas(prev => ({ ...prev, [materia]: e.target.value }))}
                                     onKeyDown={e => { if (e.key === 'Enter') guardarNota(materia, pending ?? String(notaActual)); }}
-                                    className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-[#00968f] transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : tiene ? 'bg-[#0ffff4]/15 text-[#002d2b] border-[#0ffff4]/40' : 'bg-red-50 text-red-500 border-red-200'}`}
+                                    className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-[#00968f] transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : esInsuficiente ? 'bg-red-50 text-red-600 border-red-200' : tiene ? 'bg-[#0ffff4]/15 text-[#002d2b] border-[#0ffff4]/40' : 'bg-red-50 text-red-500 border-red-200'}`}
                                     placeholder="0"
                                   />
                                   {hasPending && (
@@ -1893,7 +1905,7 @@ function AppContent() {
                                   )}
                                 </>
                               ) : (
-                                <span className={`w-10 text-center py-1 rounded font-black text-sm ${tiene ? 'bg-[#0ffff4]/20 text-[#002d2b]' : 'bg-red-50 text-red-400'}`}>{notaActual || '-'}</span>
+                                <span className={`w-10 text-center py-1 rounded font-black text-sm ${esInsuficiente ? 'bg-red-50 text-red-600' : tiene ? 'bg-[#0ffff4]/20 text-[#002d2b]' : 'bg-red-50 text-red-400'}`}>{notaActual || '-'}</span>
                               )}
                             </div>
                           </div>
@@ -1907,7 +1919,7 @@ function AppContent() {
                         {selectedStudent.notas.map((nota, i) => (
                           <div key={i} className="flex justify-between items-center p-3.5 bg-white border-b border-slate-50 hover:bg-slate-50 transition-colors last:border-0">
                             <span className="font-semibold text-slate-700 text-sm">{nota.materia}</span>
-                            <span className="bg-[#0ffff4]/20 text-[#002d2b] w-10 text-center py-1 rounded font-black">{nota.nota}</span>
+                            <span className={`w-10 text-center py-1 rounded font-black ${nota.nota < 6 ? 'bg-red-50 text-red-600' : 'bg-[#0ffff4]/20 text-[#002d2b]'}`}>{nota.nota}</span>
                           </div>
                         ))}
                       </div>
