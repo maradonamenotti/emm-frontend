@@ -409,6 +409,25 @@ function AppContent() {
     }
   };
 
+  const fetchStudentDetail = async (id: string) => {
+    const res = await fetch(`${API_URL}/api/students/${id}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.data) {
+      throw new Error(data?.error || 'No se pudo cargar el detalle del alumno');
+    }
+    return data.data as StudentData;
+  };
+
+  const openDiplomaModal = async (student: StudentData) => {
+    if (!student?.id) return;
+    try {
+      const freshStudent = await fetchStudentDetail(student.id);
+      setDiplomaModal({ isOpen: true, student: freshStudent });
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo cargar el alumno para generar el diploma');
+    }
+  };
+
   const getUserQuery = () => `user=${encodeURIComponent(user?.email || user?.documento || 'Sistema')}&nombre=${encodeURIComponent(user?.name || '')}`;
 
   const fetchAppUsers = async () => {
@@ -676,7 +695,7 @@ function AppContent() {
     if (!isAct && !isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
 
     const formData = new FormData(e.currentTarget);
-    const nacionalidad = String(formData.get('nacionalidad') || '').trim();
+    const nacionalidad = String(formData.get('nacionalidad') || diplomaModal.student.nacionalidad || '').trim();
     if (!nacionalidad) {
       toast.error('No se puede emitir el diploma sin nacionalidad cargada.');
       return;
@@ -1540,7 +1559,7 @@ function AppContent() {
                       )}
                       {student.notas && student.notas.length > 0 && (
                         <button
-                          onClick={() => setDiplomaModal({ isOpen: true, student })}
+                          onClick={() => openDiplomaModal(student)}
                           className="p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 rounded-lg transition-colors"
                           title="Generar Diploma"
                         >
@@ -2210,7 +2229,7 @@ function AppContent() {
 
                         if (type === 'preview') downloadPDF(selectedStudent);
                         else if (type === 'emit') downloadPDFAndEmit(selectedStudent);
-                        else if (type === 'diploma') setDiplomaModal({ isOpen: true, student: selectedStudent });
+                        else if (type === 'diploma') openDiplomaModal(selectedStudent);
                       };
 
                       return (
