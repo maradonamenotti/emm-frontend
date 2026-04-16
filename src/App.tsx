@@ -695,13 +695,12 @@ function AppContent() {
     if (!isAct && !isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
 
     const formData = new FormData(e.currentTarget);
-    const nacionalidad = String(formData.get('nacionalidad') || diplomaModal.student.nacionalidad || '').trim();
+    const nacionalidad = String(diplomaModal.student.nacionalidad || '').trim();
     if (!nacionalidad) {
       toast.error('No se puede emitir el diploma sin nacionalidad cargada.');
       return;
     }
     const data = {
-      nacionalidad,
       fecha_emision: formData.get('fecha_emision'),
       nombre: diplomaModal.student.nombre,
       apellido: diplomaModal.student.apellido
@@ -1653,13 +1652,9 @@ function AppContent() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nacionalidad</label>
-                  <input 
-                    required 
-                    name="nacionalidad" 
-                    defaultValue={diplomaModal.student?.nacionalidad || ''} 
-                    className="w-full border border-slate-200 rounded-xl p-3 focus:ring-2 ring-indigo-100 outline-none font-medium" 
-                    placeholder="Ej: ARGENTINA"
-                  />
+                  <div className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 text-slate-700 font-medium">
+                    {diplomaModal.student?.nacionalidad || 'SIN NACIONALIDAD CARGADA'}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fecha de Emisión</label>
