@@ -20,7 +20,13 @@ import {
   School,
   LayoutDashboard,
   Edit,
-  UserCog
+  UserCog,
+  BarChart3,
+  Columns,
+  List,
+  MessageCircle,
+  BookMarked,
+  ChevronDown,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';
@@ -83,7 +89,21 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function AppContent() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://analiticos-backend-production.up.railway.app';
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios' | 'crm'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios' | 'crm-kpis' | 'crm-kanban' | 'crm-lista' | 'crm-wa' | 'crm-plantillas'>('dashboard');
+
+  // Mapeo de activeTab a SubView de CrmModule
+  const crmSubViewMap: Record<string, 'dashboard' | 'kanban' | 'lista' | 'whatsapp' | 'plantillas'> = {
+    'crm-kpis': 'dashboard',
+    'crm-kanban': 'kanban',
+    'crm-lista': 'lista',
+    'crm-wa': 'whatsapp',
+    'crm-plantillas': 'plantillas',
+  };
+  const isCrmTab = activeTab.startsWith('crm-');
+  const isCrmWa = activeTab === 'crm-wa';
+  const crmSubView = crmSubViewMap[activeTab] ?? 'dashboard';
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [crmExpanded, setCrmExpanded] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -2471,113 +2491,236 @@ function AppContent() {
   return (
     <div className="h-screen font-sans flex overflow-hidden text-slate-900">
       {/* SIDEBAR */}
-      <aside className="w-72 bg-[#002d2b] flex flex-col shadow-2xl relative z-20 shrink-0 text-white">
-        <div className="p-6 flex items-center border-b border-white/10">
-          <img src={logoHorizontal} alt="Escuela Maradona Menotti" className="h-10 w-auto object-contain" />
+      <aside
+        style={{ width: sidebarCollapsed ? '72px' : '288px', transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', minWidth: sidebarCollapsed ? '72px' : '288px' }}
+        className="bg-[#002d2b] flex flex-col shadow-2xl relative z-20 shrink-0 text-white overflow-hidden"
+      >
+        {/* Logo / Header */}
+        <div className="px-4 h-16 flex items-center border-b border-white/10 shrink-0 overflow-hidden">
+          {sidebarCollapsed ? (
+            <div className="w-10 h-10 flex items-center justify-center mx-auto">
+              <School className="w-6 h-6 text-[#0ffff4]" />
+            </div>
+          ) : (
+            <img src={logoHorizontal} alt="Escuela Maradona Menotti" className="h-10 w-auto object-contain" />
+          )}
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto custom-scrollbar">
+        {/* Collapse toggle — pinned to right edge */}
+        <button
+          onClick={() => setSidebarCollapsed(c => !c)}
+          title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          style={{ position: 'absolute', top: '18px', right: '-13px', zIndex: 30 }}
+          className="w-6 h-6 rounded-full bg-[#1D9E75] border-2 border-[#002d2b] flex items-center justify-center shadow-lg hover:bg-[#0ffff4] hover:border-[#0ffff4] transition-all group"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+            className="text-white group-hover:text-[#002d2b] transition-colors"
+            style={{ transform: sidebarCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.25s' }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto custom-scrollbar">
           {/* SECCIÓN DASHBOARD */}
           {(isSuperadmin || user.permissions?.['analiticos'] === 'editor') && (
-            <div className="space-y-2">
-              <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">General</p>
+            <div className="space-y-1">
+              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1 mt-3">General</p>}
+              {sidebarCollapsed && <div className="h-4" />}
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
+                title="Dashboard General"
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
               >
-                <LayoutDashboard className="w-5 h-5" />
-                Dashboard General
+                <LayoutDashboard className="w-5 h-5 shrink-0" />
+                {!sidebarCollapsed && <span className="truncate">Dashboard General</span>}
               </button>
             </div>
           )}
 
           {/* SECCIÓN ANALÍTICOS */}
           {user.role !== 'student' && hasAnaliticosAccess && (
-            <div className="space-y-2">
-              <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Padrón de Alumnos</p>
+            <div className="space-y-1">
+              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1 mt-3">Padrón</p>}
+              {sidebarCollapsed && <div className="h-2" />}
               <button
                 onClick={() => setActiveTab('alumnos')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
+                title="Alumnos"
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
               >
-                <Users className="w-5 h-5" />
-                Alumnos
+                <Users className="w-5 h-5 shrink-0" />
+                {!sidebarCollapsed && <span className="truncate">Alumnos</span>}
               </button>
             </div>
           )}
 
-
-                    {/* SECCIÓN CRM */}
+          {/* SECCIÓN CRM — grupo colapsable */}
           {user.role !== 'student' && hasCrmAccess && (
-            <div className="space-y-2">
-              <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">CRM</p>
-              <button
-                onClick={() => setActiveTab('crm')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'crm' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
-              >
-                <UserCog className="w-5 h-5" />
-                Prospectos CRM
-              </button>
+            <div className="space-y-0.5">
+              {/* Header del grupo CRM */}
+              {!sidebarCollapsed ? (
+                <button
+                  onClick={() => setCrmExpanded(e => !e)}
+                  className="w-full flex items-center justify-between px-3 py-1 mt-3 mb-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 hover:text-white/50 transition-colors rounded-lg hover:bg-white/5 group"
+                >
+                  <span>CRM</span>
+                  <ChevronDown
+                    className="w-3 h-3 transition-transform duration-200"
+                    style={{ transform: crmExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                  />
+                </button>
+              ) : (
+                <div className="h-2" />
+              )}
+
+              {/* Sub-ítems: visibles si expandido (o siempre en modo icono-solo) */}
+              {(crmExpanded || sidebarCollapsed) && (
+                <div className={`space-y-0.5 ${!sidebarCollapsed ? 'pl-2 border-l border-white/10 ml-3' : ''}`}>
+                  <button onClick={() => { setActiveTab('crm-kpis'); setCrmExpanded(true); }} title="KPIs & Pipeline"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
+                      activeTab === 'crm-kpis' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    <BarChart3 className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">KPIs</span>}
+                  </button>
+
+                  <button onClick={() => { setActiveTab('crm-kanban'); setCrmExpanded(true); }} title="Kanban"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
+                      activeTab === 'crm-kanban' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    <Columns className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">Kanban</span>}
+                  </button>
+
+                  <button onClick={() => { setActiveTab('crm-lista'); setCrmExpanded(true); }} title="Lista de prospectos"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
+                      activeTab === 'crm-lista' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    <List className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">Lista</span>}
+                  </button>
+
+                  <button onClick={() => { setActiveTab('crm-wa'); setCrmExpanded(true); }} title="Bandeja WhatsApp"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
+                      activeTab === 'crm-wa' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    <MessageCircle className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">Bandeja WA</span>}
+                  </button>
+
+                  <button onClick={() => { setActiveTab('crm-plantillas'); setCrmExpanded(true); }} title="Plantillas WA"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
+                      activeTab === 'crm-plantillas' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    <BookMarked className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">Plantillas WA</span>}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-
-          {/* SECCIÓN Gestión Usuarios - Al final */}
+          {/* SECCIÓN Gestión Usuarios */}
           {canManageUsers && (
-            <div className="space-y-2">
-              <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Acceso y Seguridad</p>
+            <div className="space-y-1">
+              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1 mt-3">Seguridad</p>}
+              {sidebarCollapsed && <div className="h-2" />}
               <button
                 onClick={() => { setActiveTab('usuarios'); fetchAppUsers(); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'usuarios' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
+                title="Gestión de Usuarios"
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'usuarios' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
               >
-                <UserPlus className="w-5 h-5" />
-                Gestión de Usuarios
+                <UserPlus className="w-5 h-5 shrink-0" />
+                {!sidebarCollapsed && <span className="truncate">Gestión de Usuarios</span>}
               </button>
             </div>
           )}
-
         </nav>
 
-        <div className="p-5 bg-white/5 mt-auto border-t border-white/10">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="bg-white/10 p-2.5 rounded-xl shadow-sm ring-2 ring-[#0ffff4]/25">
+        {/* User info & logout */}
+        <div className="p-3 bg-white/5 mt-auto border-t border-white/10 shrink-0">
+          {sidebarCollapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="bg-white/10 p-2 rounded-xl ring-2 ring-[#0ffff4]/25">
                 <User className="w-5 h-5 text-[#0ffff4]" />
               </div>
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-semibold text-white truncate" title={user.name}>{user.name}</span>
-                <span className="text-[11px] font-black uppercase text-[#0ffff4] tracking-wider mt-0.5">{user.role}</span>
-              </div>
+              <button
+                onClick={handleLogout}
+                title="Cerrar Sesión"
+                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/15 text-white rounded-xl transition-all border border-white/15"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center justify-center gap-2 w-full py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl transition-all border border-white/15"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm font-bold">Cerrar Sesión</span>
-            </button>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3 px-1">
+                <div className="bg-white/10 p-2.5 rounded-xl shadow-sm ring-2 ring-[#0ffff4]/25 shrink-0">
+                  <User className="w-5 h-5 text-[#0ffff4]" />
+                </div>
+                <div className="flex flex-col overflow-hidden min-w-0">
+                  <span className="text-sm font-semibold text-white truncate" title={user.name}>{user.name}</span>
+                  <span className="text-[11px] font-black uppercase text-[#0ffff4] tracking-wider mt-0.5">{user.role}</span>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-2 w-full py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl transition-all border border-white/15"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm font-bold">Cerrar Sesión</span>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
-      {/* MAIN CONTENT HEADER + SCROLLABLE AREA */}
-      <div className="flex-1 flex flex-col h-full bg-transparent min-w-0">
-        <header className="h-20 bg-white/90 backdrop-blur-xl border-b border-[#00968f26] px-8 flex items-center sticky top-0 z-10 shadow-sm">
-          <h1 className="text-[#002d2b] text-2xl font-black tracking-tight">
-            {activeTab === 'dashboard' ? 'Módulo Analíticos: Panel de Control' : 
-             activeTab === 'usuarios' ? 'Gestión de Usuarios' : 
-             activeTab === 'crm' ? 'CRM — Gestión de Prospectos' : 
-             'Padrón de Alumnos'}
-          </h1>
-        </header>
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col h-full bg-transparent min-w-0 overflow-hidden">
+        {/* Header: oculto cuando Bandeja WA está activa para máximo espacio */}
+        {!isCrmWa && (
+          <header className="h-16 bg-white/90 backdrop-blur-xl border-b border-[#00968f26] px-8 flex items-center shrink-0 shadow-sm">
+            <h1 className="text-[#002d2b] text-xl font-black tracking-tight">
+              {activeTab === 'dashboard' ? 'Módulo Analíticos: Panel de Control' :
+               activeTab === 'alumnos' ? 'Padrón de Alumnos' :
+               activeTab === 'usuarios' ? 'Gestión de Usuarios' :
+               activeTab === 'crm-kpis' ? 'CRM — KPIs & Pipeline' :
+               activeTab === 'crm-kanban' ? 'CRM — Vista Kanban' :
+               activeTab === 'crm-lista' ? 'CRM — Lista de Prospectos' :
+               activeTab === 'crm-plantillas' ? 'CRM — Plantillas WA' : ''}
+            </h1>
+          </header>
+        )}
 
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          <div className="max-w-7xl mx-auto pb-12">
-            {activeTab === 'dashboard' ? renderDashboard() : 
-             activeTab === 'usuarios' ? renderUsuarios() : 
-             activeTab === 'crm' ? <CrmModule apiUrl={API_URL} isSuperadmin={isSuperadmin} userPermissions={user?.permissions} /> :
-             renderAlumnos()}
+        {/* Bandeja WA: ocupa TODO el espacio sin header ni padding */}
+        {isCrmWa ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <CrmModule
+              apiUrl={API_URL}
+              isSuperadmin={isSuperadmin}
+              userPermissions={user?.permissions}
+              subView="whatsapp"
+              onNavigate={(v) => setActiveTab(v === 'lista' ? 'crm-lista' : `crm-${v}` as any)}
+            />
           </div>
-        </main>
+        ) : isCrmTab ? (
+          /* Otras vistas CRM: con padding, scrollable dentro de CrmModule */
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <CrmModule
+              apiUrl={API_URL}
+              isSuperadmin={isSuperadmin}
+              userPermissions={user?.permissions}
+              subView={crmSubView}
+              onNavigate={(v) => setActiveTab(v === 'lista' ? 'crm-lista' : `crm-${v}` as any)}
+            />
+          </div>
+        ) : (
+          /* Vistas no-CRM: scrollable con padding */
+          <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <div className="max-w-7xl mx-auto pb-12">
+              {activeTab === 'dashboard' ? renderDashboard() :
+               activeTab === 'usuarios' ? renderUsuarios() :
+               renderAlumnos()}
+            </div>
+          </main>
+        )}
       </div>
 
       {renderAnaliticoModals()}

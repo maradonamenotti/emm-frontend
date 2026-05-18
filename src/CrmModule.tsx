@@ -126,12 +126,12 @@ interface CrmProps {
   apiUrl: string;
   isSuperadmin: boolean;
   userPermissions?: Record<string, string>;
+  subView: SubView;
+  onNavigate?: (view: SubView) => void;
 }
 
-export default function CrmModule({ apiUrl, isSuperadmin, userPermissions }: CrmProps) {
+export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subView, onNavigate }: CrmProps) {
   const canEdit = isSuperadmin || userPermissions?.['crm'] === 'editor';
-
-  const [subView, setSubView] = useState<SubView>('dashboard');
   const [config, setConfig] = useState<CrmConfig>({ estados: [], origenes: [], cursos: [], operadoras: [], plantillas: [] });
   const [prospectos, setProspectos] = useState<Prospecto[]>([]);
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
@@ -234,56 +234,49 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions }: Crm
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className={`h-full flex flex-col ${subView === 'whatsapp' ? '' : 'gap-4 p-4 animate-in fade-in slide-in-from-bottom-4 duration-500'}`}>
 
-      {/* HEADER */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">CRM Prospectos</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Gestión de leads y seguimiento comercial</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
-            <Download className="w-4 h-4" /> Exportar Excel
-          </button>
-          {canEdit && (
-            <button onClick={() => setShowNewProspecto(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
-              <Plus className="w-4 h-4" /> Nuevo Prospecto
+      {/* HEADER — oculto en Bandeja WA para máximo espacio */}
+      {subView !== 'whatsapp' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4 shrink-0">
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900">CRM Prospectos</h2>
+            <p className="text-slate-500 text-sm mt-0.5">Gestión de leads y seguimiento comercial</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
+              <Download className="w-4 h-4" /> Exportar Excel
             </button>
-          )}
-          {isSuperadmin && (
-            <button onClick={() => setShowConfig(true)} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm transition-all">
-              <Settings className="w-4 h-4" /> Configurar
+            {canEdit && (
+              <button onClick={() => setShowNewProspecto(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
+                <Plus className="w-4 h-4" /> Nuevo Prospecto
+              </button>
+            )}
+            {isSuperadmin && (
+              <button onClick={() => setShowConfig(true)} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm transition-all">
+                <Settings className="w-4 h-4" /> Configurar
+              </button>
+            )}
+            <button onClick={refreshAll} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all">
+              <RefreshCw className="w-4 h-4" />
             </button>
-          )}
-          <button onClick={refreshAll} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all">
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          </div>
         </div>
-      </div>
-
-      {/* SUB-NAV */}
-      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
-        {([
-          ['dashboard', BarChart3, 'KPIs'],
-          ['kanban', Users, 'Kanban'],
-          ['lista', List, 'Lista'],
-          ['whatsapp', MessageCircle, 'Bandeja WA'],
-          ['plantillas', BookMarked, 'Plantillas WA'],
-        ] as const).map(([v, Icon, label]) => (
-          <button key={v} onClick={() => setSubView(v as SubView)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${subView === v ? 'bg-white shadow text-[#002d2b]' : 'text-slate-500 hover:text-slate-700'}`}>
-            <Icon className="w-4 h-4" />{label}
-          </button>
-        ))}
-      </div>
+      )}
 
       {/* CONTENIDO */}
-      {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={(id) => { openProspecto(id); setSubView('lista'); }} />}
-      {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />}
-      {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} />}
-      {subView === 'whatsapp' && <WhatsAppInbox apiUrl={apiUrl} estados={config.estados.map(item => item.valor)} canEdit={canEdit} onCrmChanged={() => { fetchProspectos(); fetchStats(); }} />}
-      {subView === 'plantillas' && <PlantillasView plantillas={plantillas} config={config} canEdit={canEdit} apiUrl={apiUrl} onRefresh={fetchPlantillas} />}
+      {subView === 'whatsapp' ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <WhatsAppInbox apiUrl={apiUrl} estados={config.estados.map(item => item.valor)} canEdit={canEdit} onCrmChanged={() => { fetchProspectos(); fetchStats(); }} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pb-4">
+          {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={(id) => { openProspecto(id); onNavigate?.('lista'); }} />}
+          {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />}
+          {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} />}
+          {subView === 'plantillas' && <PlantillasView plantillas={plantillas} config={config} canEdit={canEdit} apiUrl={apiUrl} onRefresh={fetchPlantillas} />}
+        </div>
+      )}
 
       {/* DRAWER DETALLE */}
       {selectedProspecto && (

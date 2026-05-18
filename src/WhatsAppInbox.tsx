@@ -470,7 +470,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged }
   };
 
   return (
-    <div className="h-[calc(100vh-13rem)] min-h-[420px] grid grid-cols-[340px_minmax(0,1fr)] bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+    <div className="h-full grid grid-cols-[340px_minmax(0,1fr)] bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl">
       <section className="border-r border-slate-200 flex flex-col min-w-0 min-h-0">
         <div className="h-16 px-5 flex items-center justify-between border-b border-slate-200 bg-slate-50">
           <div>
