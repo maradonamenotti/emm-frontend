@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Users, BarChart3, List, Plus, X,
+  Users, BarChart3, Plus, X,
   ChevronDown, Settings, Download, Bell, Edit2, Trash2,
   Check, MessageCircle, Calendar, Search, Filter, RefreshCw,
   TrendingUp, Target, UserCheck, Copy, CheckCheck,
-  Globe, GraduationCap, Info, BookMarked
+  Globe, GraduationCap, Info
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WhatsAppInbox from './WhatsAppInbox';
@@ -708,7 +708,7 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="font-bold text-slate-800 text-sm truncate">{p.nombre} {p.apellido}</p>
-                              {p.fue_alumno && <GraduationCap className="w-3.5 h-3.5 text-[#00968f] shrink-0" title="Ex alumno" />}
+                              {p.fue_alumno && <span title="Ex alumno"><GraduationCap className="w-3.5 h-3.5 text-[#00968f] shrink-0" /></span>}
                             </div>
                             {p.curso_interes && <p className="text-[11px] text-slate-500 truncate">{p.curso_interes}</p>}
                             {p.pais && <p className="text-[10px] text-slate-400 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" /> {p.pais}</p>}
@@ -792,7 +792,7 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-slate-800">{p.nombre} {p.apellido}</p>
-                      {p.fue_alumno && <GraduationCap className="w-4 h-4 text-[#00968f]" title="Ex alumno de la escuela" />}
+                      {p.fue_alumno && <span title="Ex alumno de la escuela"><GraduationCap className="w-4 h-4 text-[#00968f]" /></span>}
                     </div>
                   </td>
                   <td className="px-4 py-3">

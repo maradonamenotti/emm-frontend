@@ -20,7 +20,6 @@ import {
   School,
   LayoutDashboard,
   Edit,
-  UserCog,
   BarChart3,
   Columns,
   List,
