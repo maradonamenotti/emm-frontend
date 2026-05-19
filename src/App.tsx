@@ -743,15 +743,10 @@ function AppContent() {
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Diploma_${diplomaModal.student.apellido}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+
       setDiplomaModal({ isOpen: false, student: null });
-      // Refresh student data to show new nationality/date
       fetchStudents();
     } catch (err) {
       console.error(err);
@@ -1015,7 +1010,18 @@ function AppContent() {
       return; 
     }
 
-    window.open(`${API_URL}/api/students/${student.id}/certificate`, '_blank');
+    fetch(`${API_URL}/api/students/${student.id}/certificate`)
+      .then(res => {
+        if (!res.ok) { toast.error('Error generando el analítico'); return; }
+        return res.blob();
+      })
+      .then(blob => {
+        if (!blob) return;
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      })
+      .catch(() => toast.error('Error al descargar el analítico'));
   };
 
   /* DESACTIVADO TEMPORALMENTE
