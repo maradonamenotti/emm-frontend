@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 
 interface WhatsAppMessage {
@@ -66,9 +66,21 @@ const formatDate = (value?: string) => {
   }).format(new Date(value));
 };
 
+const getConversationChannel = (conversation: WhatsAppConversation) => {
+  if (conversation.whatsapp_id?.startsWith('facebook:')) return 'Facebook';
+  if (conversation.whatsapp_id?.startsWith('instagram:')) return 'Instagram';
+  return 'WhatsApp';
+};
+
 const displayName = (conversation: WhatsAppConversation) => {
   const full = `${conversation.nombre || ''} ${conversation.apellido || ''}`.trim();
-  return full && full !== 'WHATSAPP SIN APELLIDO' ? full : conversation.telefono || 'Sin telefono';
+  const channel = getConversationChannel(conversation);
+  if (full === 'WHATSAPP SIN APELLIDO' || full === 'FACEBOOK SIN APELLIDO' || full === 'INSTAGRAM SIN APELLIDO' || !full) {
+    if (channel === 'Facebook') return 'Usuario de Facebook';
+    if (channel === 'Instagram') return 'Usuario de Instagram';
+    return conversation.telefono || 'Sin teléfono';
+  }
+  return full;
 };
 
 const CONVERSATION_PAGE_SIZE = 60;
@@ -479,7 +491,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
       <section className="border-r border-slate-200 flex flex-col min-w-0 min-h-0">
         <div className="h-16 px-5 flex items-center justify-between border-b border-slate-200 bg-slate-50">
           <div>
-            <h3 className="text-base font-black text-slate-900">Bandeja WhatsApp</h3>
+            <h3 className="text-base font-black text-slate-900">Bandeja de Entrada</h3>
             <p className="text-xs text-slate-500">{conversations.length}{hasMoreConversations ? '+' : ''} conversaciones</p>
           </div>
           <div className="flex items-center gap-1">
@@ -512,8 +524,15 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className={`font-bold truncate ${unread ? 'text-slate-950' : 'text-slate-900'}`}>{displayName(conversation)}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{conversation.telefono || 'Sin telefono'}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {getConversationChannel(conversation) === 'Facebook' && <Facebook className="w-4 h-4 text-blue-600 shrink-0" />}
+                        {getConversationChannel(conversation) === 'Instagram' && <Instagram className="w-4 h-4 text-pink-600 shrink-0" />}
+                        {getConversationChannel(conversation) === 'WhatsApp' && <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
+                        <p className={`font-bold truncate ${unread ? 'text-slate-950' : 'text-slate-900'}`}>{displayName(conversation)}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {getConversationChannel(conversation) === 'WhatsApp' ? (conversation.telefono || 'Sin teléfono') : `${getConversationChannel(conversation)}`}
+                      </p>
                     </div>
                     <div className="shrink-0 flex flex-col items-end gap-1">
                       {unread > 0 && (
@@ -573,7 +592,12 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
               <div className="min-w-0">
                 <h3 className="font-black text-slate-900 truncate">{selected ? displayName(selected) : 'Selecciona una conversacion'}</h3>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-slate-500">{selected?.telefono || 'Bandeja de entrada'}</p>
+                  {selected && getConversationChannel(selected) === 'Facebook' && <Facebook className="w-3.5 h-3.5 text-blue-600" />}
+                  {selected && getConversationChannel(selected) === 'Instagram' && <Instagram className="w-3.5 h-3.5 text-pink-600" />}
+                  {selected && getConversationChannel(selected) === 'WhatsApp' && <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />}
+                  <p className="text-xs text-slate-500">
+                    {selected ? (getConversationChannel(selected) === 'WhatsApp' ? (selected.telefono || 'Sin teléfono') : `${getConversationChannel(selected)}`) : 'Bandeja de entrada'}
+                  </p>
                   {selected && (
                     <button 
                       onClick={() => loadMessages(selected.id, { resolveContact: true })} 
@@ -678,19 +702,25 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Teléfono (WhatsApp)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                  {selected && getConversationChannel(selected) !== 'WhatsApp' ? `ID de ${getConversationChannel(selected)}` : 'Teléfono (WhatsApp)'}
+                </label>
                 <div className="relative">
                   <input 
-                    disabled={!canEdit} 
+                    disabled={!canEdit || (selected && getConversationChannel(selected) !== 'WhatsApp')} 
                     value={telefono.includes('@lid') ? 'Número oculto (Privacidad)' : telefono} 
                     onChange={event => !telefono.includes('@lid') && setTelefono(event.target.value)} 
-                    className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 ${telefono.includes('@lid') ? 'bg-slate-50 text-slate-400 italic cursor-not-allowed' : 'bg-white'}`} 
+                    className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 ${(!canEdit || (selected && getConversationChannel(selected) !== 'WhatsApp') || telefono.includes('@lid')) ? 'bg-slate-50 text-slate-400 italic cursor-not-allowed' : 'bg-white'}`} 
                   />
                 </div>
                 <p className="mt-1 text-[10px] text-slate-400 italic">
-                  {telefono.includes('@lid') 
-                    ? 'Este contacto tiene activada la privacidad de WhatsApp.' 
-                    : 'Formato internacional sin el + (ej: 54911...)'}
+                  {selected && getConversationChannel(selected) !== 'WhatsApp' ? (
+                    `Identificador único del usuario en ${getConversationChannel(selected)}.`
+                  ) : (
+                    telefono.includes('@lid') 
+                      ? 'Este contacto tiene activada la privacidad de WhatsApp.' 
+                      : 'Formato internacional sin el + (ej: 54911...)'
+                  )}
                 </p>
               </div>
 
