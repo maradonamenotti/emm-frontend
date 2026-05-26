@@ -88,7 +88,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 function AppContent() {
-  const API_URL = import.meta.env.VITE_API_URL || 'https://analiticos-backend-production.up.railway.app';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://emm-backend-production.up.railway.app';
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios' | 'crm-kpis' | 'crm-kanban' | 'crm-lista' | 'crm-wa' | 'crm-plantillas'>('dashboard');
 
