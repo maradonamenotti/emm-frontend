@@ -1,29 +1,562 @@
-@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;600&family=Montserrat:wght@700;800&family=Poppins:wght@400;500;600;700&display=swap');
+/* ============================================================
+   DESIGN SYSTEM — MARADONA MENOTTI
+   Manual de Marca v1.0
+   ============================================================ */
+
+/* Fuentes ya cargadas desde index.html via Google Fonts:
+   - Bebas Neue      → Títulos principales (reemplaza Tungsten)
+   - Nunito          → Subtítulos / UI (reemplaza Nexa)
+   - Roboto          → Texto corriente (especificado en manual)
+*/
+
 @import "tailwindcss";
 
+/* ---- Paleta del Manual de Marca & Mapeos de Tema ---- */
 @theme {
-  --color-ink: #002d2b;
-  --color-teal: #00968f;
-  --color-aqua: #0ffff4;
-  --color-night: #0c1a1a;
-  --color-cloud: #f3f6f8;
+  /* Colores primarios fijos */
+  --color-brand-teal:    #00968F;  /* Color principal de marca */
+  --color-brand-dark:    #002D2B;  /* Verde oscuro — sidebar, textos */
+  --color-brand-aqua:    #00FFF4;  /* Acento neón — hover, highlights */
+  --color-brand-blue:    #51ACC0;  /* Azul grisáceo — secundario */
+  --color-brand-navy:    #14263D;  /* Navy oscuro — variante dark */
+  --color-brand-white:   #FFFFFF;  /* Blanco puro */
+  --color-brand-black:   #000000;  /* Negro puro */
+
+  /* Aliases de compatibilidad (usados en el código existente) */
+  --color-ink:   #002D2B;
+  --color-teal:  #00968F;
+  --color-aqua:  #00FFF4;
+  --color-night: #14263D;
+  --color-cloud: #F3F6F8;
+
+  /* Overrides dinámicos del sistema para soporte Light Shift / Night Shift */
+  --color-slate-50: var(--slate-50);
+  --color-slate-100: var(--slate-100);
+  --color-slate-200: var(--slate-200);
+  --color-slate-300: var(--slate-300);
+  --color-slate-400: var(--slate-400);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-900: var(--slate-900);
+
+  /* Fondos especiales */
+  --color-chat-bg: var(--chat-bg);
+  --color-brand-sidebar: var(--sidebar-bg);
 }
 
+/* ---- Variables CSS globales ---- */
 :root {
-  color: #0f172a;
-  background: radial-gradient(circle at 20% 20%, #0ffff418 0, transparent 30%), radial-gradient(circle at 80% 0%, #00968f1c 0, transparent 28%), #f7f9fb;
-  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
-  min-height: 100%;
+  /* Tipografías del manual */
+  --font-display:  'Bebas Neue', 'Arial Narrow', sans-serif; /* Títulos */
+  --font-ui:       'Nunito', 'Arial', sans-serif;            /* UI / subtítulos */
+  --font-body:     'Roboto', 'Arial', sans-serif;            /* Texto corriente */
+
+  /* Colores primarios estáticos */
+  --brand-teal:    #00968F;
+  --brand-dark:    #002D2B;
+  --brand-aqua:    #00FFF4;
+  --brand-blue:    #51ACC0;
+  --brand-navy:    #14263D;
+
+  /* ------------------------------------------------------------
+     TEMA DEFECTO: LIGHT SHIFT (Modo Claro)
+     ------------------------------------------------------------ */
+  --white:       #FFFFFF;
+  --slate-50:    #F8FAFC;
+  --slate-100:   #F1F5F9;
+  --slate-200:   #E2E8F0;
+  --slate-300:   #CBD5E1;
+  --slate-400:   #94A3B8;
+  --slate-500:   #64748B;
+  --slate-600:   #475569;
+  --slate-700:   #334155;
+  --slate-800:   #1E293B;
+  --slate-900:   #0F172A;
+
+  --chat-bg:     #eef7f5;
+  --sidebar-bg:  #03070C; /* Negro profundo para el sidebar (consistente en ambos modos) */
+  --text-base:   #002D2B; /* El verde oscuro actúa como tinta principal */
+
+  /* Colores para las tarjetas KPI (Light Shift) */
+  --kpi-leads-color:      #002D2B;
+  --kpi-leads-bg:         rgba(0, 45, 43, 0.07);
+  --kpi-activos-color:    #00968F;
+  --kpi-activos-bg:       rgba(0, 150, 143, 0.07);
+  --kpi-inscriptos-color:  #00968F;
+  --kpi-inscriptos-bg:    rgba(0, 150, 143, 0.12);
+  --kpi-tasa-color:       #51ACC0;
+  --kpi-tasa-bg:          rgba(81, 172, 192, 0.12);
+
+  --bg-app:
+    radial-gradient(circle at 20% 20%, rgba(0, 150, 143, 0.08) 0, transparent 30%),
+    radial-gradient(circle at 80% 0%, rgba(81, 172, 192, 0.07) 0, transparent 28%),
+    #F3F6F8;
+
+  /* Alert / Warning states (Light Shift) */
+  --alert-red-bg:       #FEF2F2;
+  --alert-red-border:   #FECACA;
+  --alert-red-text:     #B91C1C;
+
+  --alert-rose-bg:      #FFF1F2;
+  --alert-rose-border:  #FECDD3;
+  --alert-rose-text:    #BE123C;
+
+  --alert-emerald-bg:   #ECFDF5;
+  --alert-emerald-border: #A7F3D0;
+  --alert-emerald-text: #047857;
+
+  --alert-amber-bg:     #FFFBEB;
+  --alert-amber-border: #FDE68A;
+  --alert-amber-text:   #B45309;
+
+  --alert-sky-bg:       #F0F9FF;
+  --alert-sky-border:   #BAE6FD;
+  --alert-sky-text:     #0369A1;
+
+  --chat-out-bg:        #DCF8C6;
+  --chat-out-txt:       #0F172A;
+
+  /* KPI cards (Light Shift) */
+  --kpi-total-bg:       #FFFFFF;
+  --kpi-total-border:   #E2E8F0;
+  --kpi-total-text:     #002D2B;
+
+  --kpi-completo-bg:     linear-gradient(135deg, #ECFDF5, #D1FAE5);
+  --kpi-completo-border: #A7F3D0;
+  --kpi-completo-text:   #065F46;
+  --kpi-completo-lbl:    #047857;
+
+  --kpi-espera-bg:       linear-gradient(135deg, #FFFBEB, #FEF3C7);
+  --kpi-espera-border:   #FDE68A;
+  --kpi-espera-text:     #92400E;
+  --kpi-espera-lbl:      #B45309;
+
+  /* Badges & action buttons (Light Shift) */
+  --dist-badge-bg:       rgba(0, 255, 244, 0.15);
+  --dist-badge-border:   rgba(0, 255, 244, 0.4);
+  --dist-badge-text:     #002D2B;
+
+  --action-badge-bg:     rgba(0, 255, 244, 0.1);
+  --action-badge-border: rgba(0, 255, 244, 0.4);
+  --action-badge-text:   #002D2B;
+  --action-badge-hover:  rgba(0, 255, 244, 0.2);
+
+  --grade-pass-bg:       rgba(0, 255, 244, 0.15);
+  --grade-pass-border:   rgba(0, 255, 244, 0.4);
+  --grade-pass-text:     #002D2B;
+
+  /* Tipografía base */
+  color: var(--text-base);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.6;
   letter-spacing: 0.01em;
+
+  /* Fondo con los colores del manual */
+  background: var(--bg-app);
+  min-height: 100%;
+}
+
+/* ------------------------------------------------------------
+   TEMA NOCTURNO: NIGHT SHIFT (Modo Oscuro)
+   ------------------------------------------------------------ */
+[data-theme="dark"] {
+  --white:       #0D192D; /* Contenedores y cards usan el Navy oscuro */
+  --slate-50:    #050B14; /* El fondo general es un deep navy aún más oscuro */
+  --slate-100:   #122035; /* Paneles internos, selects y headers secundarios */
+  --slate-200:   rgba(0, 255, 244, 0.15); /* Bordes con un resplandor de Aqua Neón */
+  --slate-300:   rgba(0, 255, 244, 0.3);
+  --slate-400:   #8FAEC4; /* Textos secundarios y deshabilitados */
+  --slate-500:   #A0B8CD;
+  --slate-600:   #B4C8D8;
+  --slate-700:   #C9D8E6;
+  --slate-800:   #E6EFF5;
+  --slate-900:   #FFFFFF; /* Títulos y textos principales en blanco puro */
+
+  --chat-bg:     #050B14;
+  --sidebar-bg:  #03070C; /* Un negro profundo para el sidebar */
+  --text-base:   #FFFFFF;
+
+  /* Colores para las tarjetas KPI (Night Shift) */
+  --kpi-leads-color:      #00FFF4;
+  --kpi-leads-bg:         rgba(0, 255, 244, 0.12);
+  --kpi-activos-color:    #51ACC0;
+  --kpi-activos-bg:       rgba(81, 172, 192, 0.15);
+  --kpi-inscriptos-color:  #00968F;
+  --kpi-inscriptos-bg:    rgba(0, 150, 143, 0.18);
+  --kpi-tasa-color:       #00FFF4;
+  --kpi-tasa-bg:          rgba(0, 255, 244, 0.15);
+
+  --bg-app:
+    radial-gradient(circle at 20% 20%, rgba(0, 255, 244, 0.05) 0, transparent 40%),
+    radial-gradient(circle at 80% 0%, rgba(81, 172, 192, 0.04) 0, transparent 30%),
+    #050B14;
+
+  /* Alert / Warning states (Night Shift) */
+  --alert-red-bg:       rgba(239, 68, 68, 0.12);
+  --alert-red-border:   rgba(239, 68, 68, 0.35);
+  --alert-red-text:     #FCA5A5;
+
+  --alert-rose-bg:      rgba(244, 63, 94, 0.12);
+  --alert-rose-border:  rgba(244, 63, 94, 0.35);
+  --alert-rose-text:    #FB7185;
+
+  --alert-emerald-bg:   rgba(16, 185, 129, 0.12);
+  --alert-emerald-border: rgba(16, 185, 129, 0.35);
+  --alert-emerald-text: #34D399;
+
+  --alert-amber-bg:     rgba(245, 158, 11, 0.1);
+  --alert-amber-border: rgba(245, 158, 11, 0.3);
+  --alert-amber-text:   #FBBF24;
+
+  --alert-sky-bg:       rgba(14, 165, 233, 0.1);
+  --alert-sky-border:   rgba(14, 165, 233, 0.3);
+  --alert-sky-text:     #38BDF8;
+
+  --chat-out-bg:        #005C53;
+  --chat-out-txt:       #FFFFFF;
+
+  /* KPI cards (Night Shift) */
+  --kpi-total-bg:       #14263D;
+  --kpi-total-border:   rgba(0, 255, 244, 0.15);
+  --kpi-total-text:     #00FFF4;
+
+  --kpi-completo-bg:     #14263D;
+  --kpi-completo-border: rgba(16, 185, 129, 0.25);
+  --kpi-completo-text:   #34D399;
+  --kpi-completo-lbl:    #A7F3D0;
+
+  --kpi-espera-bg:       #14263D;
+  --kpi-espera-border:   rgba(245, 158, 11, 0.25);
+  --kpi-espera-text:     #FBBF24;
+  --kpi-espera-lbl:      #FDE68A;
+
+  /* Badges & action buttons (Night Shift) */
+  --dist-badge-bg:       rgba(0, 255, 244, 0.1);
+  --dist-badge-border:   rgba(0, 255, 244, 0.25);
+  --dist-badge-text:     #00FFF4;
+
+  --action-badge-bg:     rgba(0, 255, 244, 0.12);
+  --action-badge-border: rgba(0, 255, 244, 0.3);
+  --action-badge-text:   #00FFF4;
+  --action-badge-hover:  rgba(0, 255, 244, 0.22);
+
+  --grade-pass-bg:       rgba(0, 255, 244, 0.12);
+  --grade-pass-border:   rgba(0, 255, 244, 0.3);
+  --grade-pass-text:     #00FFF4;
 }
 
 body {
   margin: 0;
   background: transparent;
-  font-size: 15px;
+  font-family: var(--font-ui);
+  color: var(--text-base);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Montserrat', 'Josefin Sans', 'Poppins', system-ui, -apple-system, sans-serif;
+/* Títulos — Bebas Neue (manual: Tungsten / Bebas Neue Bold) */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  font-weight: 400; /* Bebas Neue solo tiene un weight */
+  line-height: 1.15;
+}
+
+/* Subtítulos y UI — Nunito (manual: Nexa Bold) */
+h4, h5, h6, label, button, nav, .font-ui {
+  font-family: var(--font-ui);
   letter-spacing: 0.01em;
 }
+
+/* Texto corriente — Roboto (especificado en manual) */
+p, span, input, select, textarea, td, li {
+  font-family: var(--font-body);
+}
+
+/* ---- Scrollbar personalizada (colores de marca) ---- */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 150, 143, 0.3);
+  border-radius: 99px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 150, 143, 0.55);
+}
+
+/* Scrollbar global */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 150, 143, 0.3) transparent;
+}
+
+/* ---- Focus ring de marca ---- */
+:focus-visible {
+  outline: 2px solid var(--brand-teal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Animaciones de entrada ---- */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-brand-in {
+  animation: fadeSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ---- Filtro de contraste para elementos dinámicos en Modo Oscuro ---- */
+[data-theme="dark"] span[style*="color"],
+[data-theme="dark"] span[style*="background-color"],
+[data-theme="dark"] div[style*="background-color"] {
+  filter: brightness(1.25) saturate(1.15);
+}
+
+/* ---- Overrides de fondo para clases bg-white (evita romper text-white) ---- */
+.bg-white {
+  background-color: var(--white) !important;
+}
+.bg-white\/90 {
+  background-color: var(--white) !important;
+}
+.bg-white\/80 {
+  background-color: var(--white) !important;
+}
+.bg-white\/50 {
+  background-color: var(--white) !important;
+}
+
+/* ---- Ajustes de contraste para alertas, estados y badges ---- */
+.bg-red-50 {
+  background-color: var(--alert-red-bg) !important;
+}
+.bg-red-100 {
+  background-color: var(--alert-red-bg) !important;
+}
+.border-red-200, .border-red-300 {
+  border-color: var(--alert-red-border) !important;
+}
+.text-red-700, .text-red-600, .text-red-500 {
+  color: var(--alert-red-text) !important;
+}
+
+.bg-rose-50 {
+  background-color: var(--alert-rose-bg) !important;
+}
+.bg-rose-100 {
+  background-color: var(--alert-rose-bg) !important;
+}
+.border-rose-200, .border-rose-300, .border-rose-400 {
+  border-color: var(--alert-rose-border) !important;
+}
+.text-rose-700, .text-rose-600 {
+  color: var(--alert-rose-text) !important;
+}
+
+.bg-emerald-50, .bg-emerald-100 {
+  background-color: var(--alert-emerald-bg) !important;
+}
+.border-emerald-200 {
+  border-color: var(--alert-emerald-border) !important;
+}
+.text-emerald-700, .text-emerald-600 {
+  color: var(--alert-emerald-text) !important;
+}
+
+.bg-amber-50, .bg-amber-100 {
+  background-color: var(--alert-amber-bg) !important;
+}
+.border-amber-100, .border-amber-200, .border-amber-300 {
+  border-color: var(--alert-amber-border) !important;
+}
+.text-amber-700, .text-amber-800, .text-amber-900 {
+  color: var(--alert-amber-text) !important;
+}
+
+.bg-sky-50, .bg-sky-100 {
+  background-color: var(--alert-sky-bg) !important;
+}
+.border-sky-200 {
+  border-color: var(--alert-sky-border) !important;
+}
+.text-sky-700 {
+  color: var(--alert-sky-text) !important;
+}
+
+/* Outgoing WhatsApp messages: dark green bubble in dark mode */
+.bg-chat-bubble-out {
+  background-color: var(--chat-out-bg) !important;
+  color: var(--chat-out-txt) !important;
+}
+
+/* ---- KPI Cards & Dashboard Components ---- */
+.kpi-card-total {
+  background: var(--kpi-total-bg) !important;
+  border-color: var(--kpi-total-border) !important;
+}
+.kpi-card-total .value-text {
+  color: var(--kpi-total-text) !important;
+}
+
+.kpi-card-completo {
+  background: var(--kpi-completo-bg) !important;
+  border-color: var(--kpi-completo-border) !important;
+}
+.kpi-card-completo .lbl-text {
+  color: var(--kpi-completo-lbl) !important;
+}
+.kpi-card-completo .value-text {
+  color: var(--kpi-completo-text) !important;
+}
+
+.kpi-card-espera {
+  background: var(--kpi-espera-bg) !important;
+  border-color: var(--kpi-espera-border) !important;
+}
+.kpi-card-espera .lbl-text {
+  color: var(--kpi-espera-lbl) !important;
+}
+.kpi-card-espera .value-text {
+  color: var(--kpi-espera-text) !important;
+}
+
+/* ---- Distribution count badges & banners ---- */
+.distribution-badge {
+  background-color: var(--dist-badge-bg) !important;
+  border-color: var(--dist-badge-border) !important;
+  color: var(--dist-badge-text) !important;
+}
+
+/* ---- Action buttons ---- */
+.action-badge {
+  background-color: var(--action-badge-bg) !important;
+  border-color: var(--action-badge-border) !important;
+  color: var(--action-badge-text) !important;
+}
+.action-badge:hover:not(:disabled) {
+  background-color: var(--action-badge-hover) !important;
+}
+
+/* ---- Grade badges (Passed) ---- */
+.grade-badge-passed {
+  background-color: var(--grade-pass-bg) !important;
+  border-color: var(--grade-pass-border) !important;
+  color: var(--grade-pass-text) !important;
+}
+
+/* ============================================================
+   SIDEBAR PREMIUM THEME & READABILITY (UX EXPERT OVERRIDES)
+   ============================================================ */
+
+/* Asegurar que el fondo del sidebar sea negro/oscuro premium y uniforme */
+aside.bg-brand-sidebar {
+  background-color: var(--sidebar-bg) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Enlace/Botón base de la barra lateral */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Estado Activo: Acento cian neon de la marca sobre fondo sutilmente traslúcido */
+.sidebar-link-active {
+  background-color: rgba(0, 255, 244, 0.1) !important;
+  color: #00FFF4 !important;
+  font-weight: 700 !important;
+  border-color: rgba(0, 255, 244, 0.3) !important;
+  box-shadow: 0 4px 15px rgba(0, 255, 244, 0.08);
+}
+.sidebar-link-active svg,
+.sidebar-link-active span {
+  color: #00FFF4 !important;
+}
+
+/* Estado Inactivo: Blanco traslúcido de alto contraste, nunca hereda verde oscuro */
+.sidebar-link-inactive {
+  background-color: transparent !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  font-weight: 500 !important;
+}
+.sidebar-link-inactive svg,
+.sidebar-link-inactive span {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Hover de Estado Inactivo: Texto blanco puro brillante con fondo sutil */
+.sidebar-link-inactive:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #FFFFFF !important;
+}
+.sidebar-link-inactive:hover svg,
+.sidebar-link-inactive:hover span {
+  color: #FFFFFF !important;
+}
+
+/* Forzar que los textos informativos o títulos del sidebar sean claros y legibles */
+aside.bg-brand-sidebar p {
+  color: rgba(0, 255, 244, 0.7) !important;
+  font-weight: 800;
+}
+
+/* User name in sidebar */
+.sidebar-user-name {
+  color: #FFFFFF !important;
+  font-weight: 600;
+}
+
+/* User role in sidebar */
+.sidebar-user-role {
+  color: #00FFF4 !important;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+/* Theme toggle and logout buttons in sidebar */
+.sidebar-btn-secondary {
+  color: #FFFFFF !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  transition: all 0.2s ease;
+}
+.sidebar-btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Active theme button */
+.sidebar-theme-active-light {
+  background-color: #00968F !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 6px rgba(0, 150, 143, 0.3) !important;
+}
+.sidebar-theme-active-dark {
+  background-color: #00FFF4 !important;
+  color: #002D2B !important;
+  box-shadow: 0 2px 6px rgba(0, 255, 244, 0.3) !important;
+}
+.sidebar-theme-inactive {
+  color: rgba(255, 255, 255, 0.7) !important;
+  background-color: transparent !important;
+}
+.sidebar-theme-inactive:hover {
+  color: #FFFFFF !important;
+}
+

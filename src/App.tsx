@@ -26,6 +26,8 @@ import {
   MessageCircle,
   BookMarked,
   ChevronDown,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';
@@ -89,6 +91,15 @@ function AppContent() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://analiticos-backend-production.up.railway.app';
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios' | 'crm-kpis' | 'crm-kanban' | 'crm-lista' | 'crm-wa' | 'crm-plantillas'>('dashboard');
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('emm-theme') as 'light' | 'dark') || 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('emm-theme', theme);
+  }, [theme]);
 
   // Mapeo de activeTab a SubView de CrmModule
   const crmSubViewMap: Record<string, 'dashboard' | 'kanban' | 'lista' | 'whatsapp' | 'plantillas'> = {
@@ -1266,17 +1277,17 @@ function AppContent() {
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h2 className="text-3xl font-bold text-slate-900 drop-shadow-sm">Dashboard General</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <div className="kpi-card-total p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
             <h3 className="text-slate-500 text-sm font-medium mb-3 uppercase tracking-wider">Total Alumnos</h3>
-            <p className="text-4xl font-extrabold text-[#002d2b]">{totalAlumnos}</p>
+            <p className="text-4xl font-extrabold value-text">{totalAlumnos}</p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="text-emerald-700 text-sm font-medium mb-3 uppercase tracking-wider">Con Analítico</h3>
-            <p className="text-4xl font-extrabold text-emerald-800">{conAnalitico}</p>
+          <div className="kpi-card-completo p-6 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="lbl-text text-sm font-medium mb-3 uppercase tracking-wider">Con Analítico</h3>
+            <p className="text-4xl font-extrabold value-text">{conAnalitico}</p>
           </div>
-          <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-6 rounded-2xl border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="text-amber-700 text-sm font-medium mb-3 uppercase tracking-wider">Esperando Notas</h3>
-            <p className="text-4xl font-extrabold text-amber-800">{sinAnalitico}</p>
+          <div className="kpi-card-espera p-6 rounded-2xl border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="lbl-text text-sm font-medium mb-3 uppercase tracking-wider">Esperando Notas</h3>
+            <p className="text-4xl font-extrabold value-text">{sinAnalitico}</p>
           </div>
         </div>
 
@@ -1289,7 +1300,7 @@ function AppContent() {
             {Object.entries(porCarrera).map(([carr, count]) => (
               <div key={carr} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <span className="font-semibold text-slate-700 line-clamp-1" title={carr}>{carr}</span>
-                <span className="bg-[#0ffff4]/25 text-[#002d2b] px-4 py-1.5 rounded-full text-sm font-black shadow-inner border border-[#0ffff4]/50">{count}</span>
+                <span className="distribution-badge px-4 py-1.5 rounded-full text-sm font-black shadow-inner border">{count}</span>
               </div>
             ))}
             {Object.keys(porCarrera).length === 0 && (
@@ -1305,7 +1316,7 @@ function AppContent() {
               {Object.entries(emitidosPorLicencia).map(([lic, count]) => (
                 <div key={lic} className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-100 bg-slate-50/60">
                   <span className="font-semibold text-slate-700">{lic}</span>
-                  <span className="text-sm font-black text-[#002d2b] bg-[#0ffff4]/20 border border-[#0ffff4]/40 rounded-full px-3 py-1">{count}</span>
+                  <span className="distribution-badge text-sm font-black rounded-full px-3 py-1 border">{count}</span>
                 </div>
               ))}
               {Object.keys(emitidosPorLicencia).length === 0 && (
@@ -1519,14 +1530,14 @@ function AppContent() {
                     />
                     <div className={`p-3 rounded-xl hidden sm:flex shrink-0 transition-colors ${
                       selectedStudents.includes(student.id || '')
-                        ? 'bg-[#0ffff4]/30 text-[#002d2b]'
+                        ? 'bg-[#0ffff4]/30 text-slate-900'
                         : student.situacion === 'DUPLICADO' 
                           ? 'bg-rose-100 group-hover:bg-rose-200' 
                           : hasInsufficientNotes
                             ? 'bg-red-100 group-hover:bg-red-200'
                           : 'bg-[#0ffff4]/10 group-hover:bg-[#0ffff4]/20'
                     }`}>
-                      <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : hasInsufficientNotes ? 'text-red-700' : 'text-[#002d2b]'}`} />
+                      <User className={`w-5 h-5 ${student.situacion === 'DUPLICADO' ? 'text-rose-700' : hasInsufficientNotes ? 'text-red-700' : 'text-slate-900'}`} />
                     </div>
                     <div className="flex flex-col gap-1">
                       <h3 className="text-lg font-bold text-slate-900 leading-tight">
@@ -1541,7 +1552,7 @@ function AppContent() {
                         <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider border border-slate-200">
                           LICENCIA {formatLicencia(student.licencia)}
                         </span>
-                        <span className="text-[#002d2b] bg-[#0ffff4]/15 px-2 py-0.5 rounded uppercase tracking-wider border border-[#0ffff4]/40">
+                        <span className="text-slate-900 bg-[#0ffff4]/15 px-2 py-0.5 rounded uppercase tracking-wider border border-[#0ffff4]/40">
                           COMISIÓN {student.comision || '-'}
                         </span>
                       </div>
@@ -1630,7 +1641,7 @@ function AppContent() {
                 >
                   Anterior
                 </button>
-                <div className="px-4 py-2 bg-[#0ffff4]/15 text-[#002d2b] rounded-lg font-black text-sm border border-[#0ffff4]/40">
+                <div className="distribution-badge px-4 py-2 rounded-lg font-black text-sm border">
                   {currentPage} de {Math.max(1, Math.ceil(filteredStudents.length / itemsPerPage))}
                 </div>
                 <button
@@ -1738,7 +1749,7 @@ function AppContent() {
                         {canEditAnaliticos && (
                           <button
                             onClick={startEditDatos}
-                            className="text-[#00968f] hover:text-[#002d2b] text-xs font-bold border border-[#0ffff4]/40 bg-[#0ffff4]/15 px-2 py-0.5 rounded transition-colors"
+                            className="action-badge text-xs font-bold border px-2 py-0.5 rounded transition-colors"
                           >
                             Editar Datos
                           </button>
@@ -1959,7 +1970,7 @@ function AppContent() {
                           <button
                             onClick={() => openMailClient(selectedStudent)}
                             disabled={!selectedStudent.email}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#0ffff4]/40 bg-[#0ffff4]/15 text-[#002d2b] hover:bg-[#0ffff4]/25 text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="action-badge inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Mail className="w-4 h-4" />
                             Abrir mail
@@ -2075,7 +2086,7 @@ function AppContent() {
                                     value={pending !== undefined ? pending : (notaActual || '')}
                                     onChange={e => setPendingNotas(prev => ({ ...prev, [materia]: e.target.value }))}
                                     onKeyDown={e => { if (e.key === 'Enter') guardarNota(materia, pending ?? String(notaActual)); }}
-                                    className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-[#00968f] transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : esInsuficiente ? 'bg-red-50 text-red-600 border-red-200' : tiene ? 'bg-[#0ffff4]/15 text-[#002d2b] border-[#0ffff4]/40' : 'bg-red-50 text-red-500 border-red-200'}`}
+                                    className={`w-16 text-center px-2 py-1 rounded-lg text-sm font-black border outline-none focus:ring-2 focus:ring-[#00968f] transition-colors ${hasPending ? 'bg-yellow-100 border-yellow-400 text-yellow-900' : esInsuficiente ? 'bg-red-50 text-red-600 border-red-200' : tiene ? 'grade-badge-passed' : 'bg-red-50 text-red-500 border-red-200'}`}
                                     placeholder="0"
                                   />
                                   {hasPending && (
@@ -2089,7 +2100,7 @@ function AppContent() {
                                   )}
                                 </>
                               ) : (
-                                <span className={`w-10 text-center py-1 rounded font-black text-sm ${esInsuficiente ? 'bg-red-50 text-red-600' : tiene ? 'bg-[#0ffff4]/20 text-[#002d2b]' : 'bg-red-50 text-red-400'}`}>{notaActual || '-'}</span>
+                                <span className={`w-10 text-center py-1 rounded font-black text-sm ${esInsuficiente ? 'bg-red-50 text-red-600' : tiene ? 'grade-badge-passed' : 'bg-red-50 text-red-400'}`}>{notaActual || '-'}</span>
                               )}
                             </div>
                           </div>
@@ -2103,7 +2114,7 @@ function AppContent() {
                         {selectedStudent.notas.map((nota, i) => (
                           <div key={i} className="flex justify-between items-center p-3.5 bg-white border-b border-slate-50 hover:bg-slate-50 transition-colors last:border-0">
                             <span className="font-semibold text-slate-700 text-sm">{nota.materia}</span>
-                            <span className={`w-10 text-center py-1 rounded font-black ${nota.nota < 6 ? 'bg-red-50 text-red-600' : 'bg-[#0ffff4]/20 text-[#002d2b]'}`}>{nota.nota}</span>
+                            <span className={`w-10 text-center py-1 rounded font-black ${nota.nota < 6 ? 'bg-red-50 text-red-600' : 'grade-badge-passed'}`}>{nota.nota}</span>
                           </div>
                         ))}
                       </div>
@@ -2260,7 +2271,7 @@ function AppContent() {
                           <button
                             onClick={() => !disabled && handleDownloadClick('preview')}
                             disabled={disabled}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all border border-[#0ffff4]/40 bg-[#0ffff4]/10 hover:bg-[#0ffff4]/20 text-[#002d2b]${opacityClasses} ${!isComplete ? 'grayscale-[0.5]' : ''}`}
+                            className={`action-badge px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all border ${opacityClasses} ${!isComplete ? 'grayscale-[0.5]' : ''}`}
                             title={isComplete ? "Vista previa del PDF" : "Faltan notas o hay notas menores a 6"}
                           >
                             <Download className="w-4 h-4" /> Vista Previa
@@ -2458,7 +2469,7 @@ function AppContent() {
                         <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded uppercase tracking-widest">Superadmin</span>
                       ) : (
                         <>
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${u.permissions?.['analiticos'] !== 'none' ? 'bg-[#0ffff4]/10 text-[#002d2b] border-[#0ffff4]/30' : 'bg-slate-100 text-slate-300 border-slate-200'}`}>
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${u.permissions?.['analiticos'] !== 'none' ? 'distribution-badge' : 'bg-slate-100 text-slate-300 border-slate-200'}`}>
                             Analíticos: {u.permissions?.['analiticos'] || 'none'}
                           </span>
                         </>
@@ -2498,7 +2509,7 @@ function AppContent() {
       {/* SIDEBAR */}
       <aside
         style={{ width: sidebarCollapsed ? '72px' : '288px', transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', minWidth: sidebarCollapsed ? '72px' : '288px' }}
-        className="bg-[#002d2b] flex flex-col shadow-2xl relative z-20 shrink-0 text-white overflow-hidden"
+        className="bg-brand-sidebar flex flex-col shadow-2xl relative z-20 shrink-0 text-white overflow-hidden"
       >
         {/* Logo / Header */}
         <div className="px-4 h-16 flex items-center border-b border-white/10 shrink-0 overflow-hidden">
@@ -2516,7 +2527,7 @@ function AppContent() {
           onClick={() => setSidebarCollapsed(c => !c)}
           title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
           style={{ position: 'absolute', top: '18px', right: '-13px', zIndex: 30 }}
-          className="w-6 h-6 rounded-full bg-[#1D9E75] border-2 border-[#002d2b] flex items-center justify-center shadow-lg hover:bg-[#0ffff4] hover:border-[#0ffff4] transition-all group"
+          className="w-6 h-6 rounded-full bg-[#1D9E75] border-2 border-brand-sidebar flex items-center justify-center shadow-lg hover:bg-[#0ffff4] hover:border-[#0ffff4] transition-all group"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
@@ -2532,12 +2543,12 @@ function AppContent() {
           {/* SECCIÓN DASHBOARD */}
           {(isSuperadmin || user.permissions?.['analiticos'] === 'editor') && (
             <div className="space-y-1">
-              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1 mt-3">General</p>}
+              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 mb-1 mt-3">General</p>}
               {sidebarCollapsed && <div className="h-4" />}
               <button
                 onClick={() => setActiveTab('dashboard')}
                 title="Dashboard General"
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
+                className={`sidebar-link ${activeTab === 'dashboard' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}
               >
                 <LayoutDashboard className="w-5 h-5 shrink-0" />
                 {!sidebarCollapsed && <span className="truncate">Dashboard General</span>}
@@ -2548,12 +2559,12 @@ function AppContent() {
           {/* SECCIÓN ANALÍTICOS */}
           {user.role !== 'student' && hasAnaliticosAccess && (
             <div className="space-y-1">
-              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1 mt-3">Padrón</p>}
+              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 mb-1 mt-3">Padrón</p>}
               {sidebarCollapsed && <div className="h-2" />}
               <button
                 onClick={() => setActiveTab('alumnos')}
                 title="Alumnos"
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'alumnos' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
+                className={`sidebar-link ${activeTab === 'alumnos' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}
               >
                 <Users className="w-5 h-5 shrink-0" />
                 {!sidebarCollapsed && <span className="truncate">Alumnos</span>}
@@ -2568,7 +2579,7 @@ function AppContent() {
               {!sidebarCollapsed ? (
                 <button
                   onClick={() => setCrmExpanded(e => !e)}
-                  className="w-full flex items-center justify-between px-3 py-1 mt-3 mb-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 hover:text-white/50 transition-colors rounded-lg hover:bg-white/5 group"
+                  className="w-full flex items-center justify-between px-3 py-1 mt-3 mb-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5 group"
                 >
                   <span>CRM</span>
                   <ChevronDown
@@ -2584,36 +2595,31 @@ function AppContent() {
               {(crmExpanded || sidebarCollapsed) && (
                 <div className={`space-y-0.5 ${!sidebarCollapsed ? 'pl-2 border-l border-white/10 ml-3' : ''}`}>
                   <button onClick={() => { setActiveTab('crm-kpis'); setCrmExpanded(true); }} title="KPIs & Pipeline"
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
-                      activeTab === 'crm-kpis' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    className={`sidebar-link ${activeTab === 'crm-kpis' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}>
                     <BarChart3 className="w-4 h-4 shrink-0" />
                     {!sidebarCollapsed && <span className="truncate">KPIs</span>}
                   </button>
 
                   <button onClick={() => { setActiveTab('crm-kanban'); setCrmExpanded(true); }} title="Kanban"
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
-                      activeTab === 'crm-kanban' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    className={`sidebar-link ${activeTab === 'crm-kanban' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}>
                     <Columns className="w-4 h-4 shrink-0" />
                     {!sidebarCollapsed && <span className="truncate">Kanban</span>}
                   </button>
 
                   <button onClick={() => { setActiveTab('crm-lista'); setCrmExpanded(true); }} title="Lista de prospectos"
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
-                      activeTab === 'crm-lista' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    className={`sidebar-link ${activeTab === 'crm-lista' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}>
                     <List className="w-4 h-4 shrink-0" />
                     {!sidebarCollapsed && <span className="truncate">Lista</span>}
                   </button>
 
                   <button onClick={() => { setActiveTab('crm-wa'); setCrmExpanded(true); }} title="Bandeja WhatsApp"
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
-                      activeTab === 'crm-wa' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    className={`sidebar-link ${activeTab === 'crm-wa' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}>
                     <MessageCircle className="w-4 h-4 shrink-0" />
                     {!sidebarCollapsed && <span className="truncate">Bandeja WA</span>}
                   </button>
 
                   <button onClick={() => { setActiveTab('crm-plantillas'); setCrmExpanded(true); }} title="Plantillas WA"
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
-                      activeTab === 'crm-plantillas' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/55 hover:bg-white/5 hover:text-white font-medium'}`}>
+                    className={`sidebar-link ${activeTab === 'crm-plantillas' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}>
                     <BookMarked className="w-4 h-4 shrink-0" />
                     {!sidebarCollapsed && <span className="truncate">Plantillas WA</span>}
                   </button>
@@ -2625,12 +2631,12 @@ function AppContent() {
           {/* SECCIÓN Gestión Usuarios */}
           {canManageUsers && (
             <div className="space-y-1">
-              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1 mt-3">Seguridad</p>}
+              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 mb-1 mt-3">Seguridad</p>}
               {sidebarCollapsed && <div className="h-2" />}
               <button
                 onClick={() => { setActiveTab('usuarios'); fetchAppUsers(); }}
                 title="Gestión de Usuarios"
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'usuarios' ? 'bg-[#0ffff4]/10 text-[#0ffff4] font-bold shadow-sm border border-[#0ffff4]/30' : 'text-white/60 hover:bg-white/5 hover:text-white font-medium'}`}
+                className={`sidebar-link ${activeTab === 'usuarios' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}
               >
                 <UserPlus className="w-5 h-5 shrink-0" />
                 {!sidebarCollapsed && <span className="truncate">Gestión de Usuarios</span>}
@@ -2647,9 +2653,16 @@ function AppContent() {
                 <User className="w-5 h-5 text-[#0ffff4]" />
               </div>
               <button
+                onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+                title={theme === 'light' ? 'Activar Night Shift' : 'Activar Light Shift'}
+                className="sidebar-btn-secondary w-10 h-10 flex items-center justify-center rounded-xl transition-all"
+              >
+                {theme === 'light' ? <Moon className="w-4 h-4 text-[#0ffff4]" /> : <Sun className="w-4 h-4 text-yellow-400" />}
+              </button>
+              <button
                 onClick={handleLogout}
                 title="Cerrar Sesión"
-                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/15 text-white rounded-xl transition-all border border-white/15"
+                className="sidebar-btn-secondary w-10 h-10 flex items-center justify-center rounded-xl transition-all"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -2661,13 +2674,32 @@ function AppContent() {
                   <User className="w-5 h-5 text-[#0ffff4]" />
                 </div>
                 <div className="flex flex-col overflow-hidden min-w-0">
-                  <span className="text-sm font-semibold text-white truncate" title={user.name}>{user.name}</span>
-                  <span className="text-[11px] font-black uppercase text-[#0ffff4] tracking-wider mt-0.5">{user.role}</span>
+                  <span className="sidebar-user-name text-sm font-semibold truncate" title={user.name}>{user.name}</span>
+                  <span className="sidebar-user-role text-[11px] font-black uppercase tracking-wider mt-0.5">{user.role}</span>
                 </div>
               </div>
+
+              {/* Selector de Tema */}
+              <div className="flex items-center justify-between p-1 bg-black/25 rounded-xl border border-white/10">
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${theme === 'light' ? 'sidebar-theme-active-light' : 'sidebar-theme-inactive'}`}
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>Light Shift</span>
+                </button>
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'sidebar-theme-active-dark' : 'sidebar-theme-inactive'}`}
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>Night Shift</span>
+                </button>
+              </div>
+
               <button
                 onClick={handleLogout}
-                className="flex items-center justify-center gap-2 w-full py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl transition-all border border-white/15"
+                className="sidebar-btn-secondary flex items-center justify-center gap-2 w-full py-2.5 rounded-xl transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="text-sm font-bold">Cerrar Sesión</span>
@@ -2682,7 +2714,7 @@ function AppContent() {
         {/* Header: oculto cuando Bandeja WA está activa para máximo espacio */}
         {!isCrmWa && (
           <header className="h-16 bg-white/90 backdrop-blur-xl border-b border-[#00968f26] px-8 flex items-center shrink-0 shadow-sm">
-            <h1 className="text-[#002d2b] text-xl font-black tracking-tight">
+            <h1 className="text-slate-900 text-xl font-black tracking-tight">
               {activeTab === 'dashboard' ? 'Módulo Analíticos: Panel de Control' :
                activeTab === 'alumnos' ? 'Padrón de Alumnos' :
                activeTab === 'usuarios' ? 'Gestión de Usuarios' :

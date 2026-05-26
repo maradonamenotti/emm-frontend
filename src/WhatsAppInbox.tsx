@@ -18,6 +18,7 @@ interface WhatsAppConversation {
   nombre: string;
   apellido: string;
   telefono?: string;
+  whatsapp_id?: string;   // Prefijo de canal: "facebook:...", "instagram:..." o número WA
   email?: string;
   pais?: string;
   curso_interes?: string;
@@ -582,7 +583,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
 
       <section className="grid grid-cols-[minmax(0,1fr)_320px] min-w-0 min-h-0 h-full overflow-hidden">
         {/* 1. EL CONTENEDOR PRINCIPAL DE LA COLUMNA */}
-        <div className="flex flex-col h-full min-h-0 min-w-0 bg-[#eef7f5] overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 min-w-0 bg-chat-bg overflow-hidden">
           {/* 2. EL HEADER (Fijo) */}
           <div className="flex-none h-[72px] px-6 flex items-center justify-between border-b border-slate-200 bg-white">
             <div className="flex items-center gap-3 min-w-0">
@@ -613,7 +614,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
           </div>
 
           {/* 3. EL HISTORIAL DE MENSAJES (El único que scrollea) */}
-          <div ref={chatContainerRef} onScroll={handleChatScroll} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 relative bg-[#eef7f5] custom-scrollbar">
+          <div ref={chatContainerRef} onScroll={handleChatScroll} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 relative bg-chat-bg custom-scrollbar">
             {qrCode && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm p-8 text-center">
                 <div className="bg-white p-4 rounded-2xl shadow-xl border border-slate-200 mb-6">
@@ -648,7 +649,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                 key={message.id_mensaje} 
                 className={`flex flex-col ${message.direccion === 'saliente' ? 'items-end' : 'items-start'}`}
               >
-                <div className={`max-w-[72%] px-4 py-2.5 shadow-sm rounded-xl ${message.direccion === 'saliente' ? 'bg-[#dcf8c6] text-slate-900 rounded-br-sm' : 'bg-white text-slate-900 rounded-bl-sm'}`}>
+                <div className={`max-w-[72%] px-4 py-2.5 shadow-sm rounded-xl ${message.direccion === 'saliente' ? 'bg-chat-bubble-out text-slate-900 rounded-br-sm' : 'bg-white text-slate-900 rounded-bl-sm'}`}>
                   <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-left">{message.cuerpo_mensaje}</p>
                   <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-slate-500">
                     <span>{formatDate(message.fecha_envio)}</span>

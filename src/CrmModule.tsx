@@ -346,10 +346,10 @@ function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Leads', value: stats.total, icon: Users, color: '#3B82F6', bg: '#EFF6FF' },
-          { label: 'Activos', value: stats.activos, icon: TrendingUp, color: '#F59E0B', bg: '#FFFBEB' },
-          { label: 'Inscriptos', value: stats.inscriptos, icon: UserCheck, color: '#22C55E', bg: '#F0FDF4' },
-          { label: 'Tasa Conversión', value: `${stats.tasaConversion}%`, icon: Target, color: '#8B5CF6', bg: '#F5F3FF' },
+          { label: 'Total Leads', value: stats.total, icon: Users, color: 'var(--kpi-leads-color)', bg: 'var(--kpi-leads-bg)' },
+          { label: 'Activos', value: stats.activos, icon: TrendingUp, color: 'var(--kpi-activos-color)', bg: 'var(--kpi-activos-bg)' },
+          { label: 'Inscriptos', value: stats.inscriptos, icon: UserCheck, color: 'var(--kpi-inscriptos-color)', bg: 'var(--kpi-inscriptos-bg)' },
+          { label: 'Tasa Conversión', value: `${stats.tasaConversion}%`, icon: Target, color: 'var(--kpi-tasa-color)', bg: 'var(--kpi-tasa-bg)' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl shrink-0" style={{ backgroundColor: bg }}>
@@ -416,7 +416,10 @@ function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null
             {stats.porEstado.map(e => (
               <div key={e.estado}>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold" style={{ color: e.color }}>{e.estado}</span>
+                  <span className="font-semibold text-slate-800 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: e.color }} />
+                    {e.estado}
+                  </span>
                   <span className="font-bold text-slate-900">{e.count}</span>
                 </div>
                 <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
