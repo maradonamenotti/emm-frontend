@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 
 interface WhatsAppMessage {
@@ -433,6 +433,26 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
     }
   };
 
+  const deleteProspecto = async () => {
+    if (!selected || !canEdit) return;
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este prospecto y todos sus mensajes? Esta acción no se puede deshacer.')) return;
+    try {
+      const response = await fetch(`${apiUrl}/api/crm/prospectos/${selected.id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || data.error || 'No se pudo eliminar');
+      }
+      toast.success('Prospecto eliminado exitosamente');
+      setConversations(prev => prev.filter(item => item.id !== selected.id));
+      setSelectedId('');
+      onCrmChangedRef.current();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar');
+    }
+  };
+
   const logout = async () => {
     if (!window.confirm('¿Estás seguro de que quieres cerrar la sesión de WhatsApp? Tendrás que escanear el QR de nuevo.')) return;
     try {
@@ -779,14 +799,24 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                 <textarea disabled={!canEdit} value={notas} onChange={event => setNotas(event.target.value)} className="w-full min-h-40 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none resize-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50" />
               </div>
 
-              <button
-                onClick={saveProspecto}
-                disabled={saving || !canEdit}
-                className="w-full h-11 rounded-xl bg-[#002d2b] text-white flex items-center justify-center gap-2 text-sm font-bold hover:bg-[#00968f] disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                Guardar cambios
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={saveProspecto}
+                  disabled={saving || !canEdit}
+                  className="flex-1 h-11 rounded-xl bg-[#002d2b] text-white flex items-center justify-center gap-2 text-sm font-bold hover:bg-[#00968f] disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  Guardar
+                </button>
+                <button
+                  onClick={deleteProspecto}
+                  disabled={saving || !canEdit}
+                  className="flex-none px-4 h-11 rounded-xl border-2 border-red-100 bg-white text-red-500 flex items-center justify-center hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  title="Eliminar prospecto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </aside>
