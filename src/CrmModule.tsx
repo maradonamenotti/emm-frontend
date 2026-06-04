@@ -57,7 +57,7 @@ type SubView = 'dashboard' | 'kanban' | 'lista' | 'whatsapp' | 'plantillas';
 type ConfigTab = 'estados' | 'origenes' | 'cursos' | 'operadoras';
 
 // ─── Plantillas de mensajes ───────────────────────────────────────────────────
-interface Plantilla {
+export interface Plantilla {
   id: string;
   titulo: string;
   categoria: string;
@@ -245,6 +245,35 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
     };
   }, [apiUrl, fetchProspectos, fetchStats]);
 
+  useEffect(() => {
+    if (!stats?.alertasSeguimiento?.length) return;
+    
+    const interval = setInterval(() => {
+      const now = new Date();
+      stats.alertasSeguimiento.forEach((a: any) => {
+        const alertTime = new Date(a.fecha_proximo_aviso);
+        const diffMs = alertTime.getTime() - now.getTime();
+        
+        // Trigger if the alert is due within a +/- 1 minute window
+        if (diffMs > -60000 && diffMs <= 60000) {
+          toast.success(`⏰ Seguimiento pendiente: ${a.nombre}\n${a.nota}`, {
+            icon: '🔔',
+            id: `alert-seguimiento-${a.id}`, // Previene duplicados
+            duration: 15000,
+            style: {
+              border: '1px solid #00968f',
+              padding: '16px',
+              color: '#002d2b',
+              fontWeight: 'bold',
+            },
+          });
+        }
+      });
+    }, 30000); // Chequear cada 30 segundos
+
+    return () => clearInterval(interval);
+  }, [stats]);
+
   const handleExport = () => {
     const params = new URLSearchParams();
     if (filterEstado) params.set('estado', filterEstado);
@@ -344,7 +373,7 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
       {/* CONTENIDO */}
       {subView === 'whatsapp' ? (
         <div className="flex-1 min-h-0 overflow-hidden">
-          <WhatsAppInbox apiUrl={apiUrl} estados={config.estados.map(item => item.valor)} canEdit={canEdit} onCrmChanged={() => { fetchProspectos(); fetchStats(); }} initialId={waInitialId} />
+          <WhatsAppInbox apiUrl={apiUrl} estados={config.estados.map(item => item.valor)} canEdit={canEdit} onCrmChanged={() => { fetchProspectos(); fetchStats(); }} initialId={waInitialId} plantillas={plantillas} />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pb-4">
@@ -919,8 +948,45 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
 // LISTA
 // ═══════════════════════════════════════════════════════════════════════════════
 function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDelete, searchTerm, setSearchTerm, filterEstado, setFilterEstado, filterOrigen, setFilterOrigen, filterAsignado, setFilterAsignado, filterCurso, setFilterCurso }: any) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   return (
     <div className="space-y-4">
+      {selectedIds.length > 0 && (
+        <div className="bg-[#002d2b] text-white rounded-2xl px-6 py-3 flex items-center justify-between animate-in fade-in slide-in-from-top-2 shadow-lg">
+          <span className="font-bold">{selectedIds.length} prospectos seleccionados</span>
+          <div className="flex gap-2 items-center">
+            {canEdit && (
+              <>
+                <select
+                  className="px-3 py-1.5 rounded-lg text-sm bg-white text-slate-900 font-semibold outline-none"
+                  onChange={(e) => {
+                    if (!e.target.value || !confirm(`¿Cambiar estado de ${selectedIds.length} prospectos?`)) { e.target.value = ''; return; }
+                    const estado = e.target.value;
+                    selectedIds.forEach(id => onEstadoChange(id, estado));
+                    setSelectedIds([]);
+                  }}
+                >
+                  <option value="">Mover a estado...</option>
+                  {config.estados.map((e: CrmConfigItem) => <option key={e.id} value={e.valor}>{e.valor}</option>)}
+                </select>
+                <button
+                  onClick={() => {
+                    if (!confirm(`¿Estás seguro de eliminar ${selectedIds.length} prospectos de forma permanente?`)) return;
+                    selectedIds.forEach(id => onDelete(id));
+                    setSelectedIds([]);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 font-bold text-sm transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" /> Eliminar
+                </button>
+              </>
+            )}
+            <button onClick={() => setSelectedIds([])} className="p-1.5 hover:bg-white/10 rounded-lg ml-2"><X className="w-5 h-5" /></button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -955,6 +1021,9 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={selectedIds.length === prospectos.length && prospectos.length > 0} onChange={e => setSelectedIds(e.target.checked ? prospectos.map((p: any) => p.id) : [])} className="rounded border-slate-300 text-[#00968f] focus:ring-[#00968f] cursor-pointer" />
+                </th>
                 {['Nombre', 'Contacto', 'País', 'Curso', 'Origen', 'Estado', 'Asignado', 'Últ. contacto', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                 ))}
@@ -963,6 +1032,12 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
             <tbody className="divide-y divide-slate-50">
               {prospectos.map((p: Prospecto) => (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onOpen(p.id)}>
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={e => {
+                      if (e.target.checked) setSelectedIds([...selectedIds, p.id]);
+                      else setSelectedIds(selectedIds.filter(id => id !== p.id));
+                    }} className="rounded border-slate-300 text-[#00968f] focus:ring-[#00968f] cursor-pointer" />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-slate-800">{p.nombre} {p.apellido}</p>

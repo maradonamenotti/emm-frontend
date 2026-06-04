@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2 } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { Plantilla } from './CrmModule';
 
 interface WhatsAppMessage {
   id_mensaje: string;
@@ -55,6 +56,7 @@ interface Props {
   canEdit: boolean;
   onCrmChanged: () => void;
   initialId?: string;
+  plantillas?: Plantilla[];
 }
 
 const formatDate = (value?: string) => {
@@ -118,7 +120,7 @@ const upsertConversation = (items: WhatsAppConversation[], next: WhatsAppConvers
   return mergeConversations(items, [next]);
 };
 
-export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, initialId }: Props) {
+export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, initialId, plantillas = [] }: Props) {
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
@@ -135,6 +137,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   const [isReady, setIsReady] = useState(false);
   const selected = useMemo(() => conversations.find(item => item.id === selectedId) || null, [conversations, selectedId]);
 
+  const [showPlantillas, setShowPlantillas] = useState(false);
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -666,7 +669,19 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                 className={`flex flex-col ${message.direccion === 'saliente' ? 'items-end' : 'items-start'}`}
               >
                 <div className={`max-w-[72%] px-4 py-2.5 shadow-sm rounded-xl ${message.direccion === 'saliente' ? 'bg-chat-bubble-out text-slate-900 rounded-br-sm' : 'bg-white text-slate-900 rounded-bl-sm'}`}>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-left">{message.cuerpo_mensaje}</p>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words text-left">
+                    {(() => {
+                      const text = message.cuerpo_mensaje;
+                      const match = text.match(/^\[Adjunto (image|video|audio)\]\((https?:\/\/[^\)]+)\)$/i);
+                      if (match) {
+                        const [, type, url] = match;
+                        if (type.toLowerCase() === 'image') return <img src={url} alt="Adjunto" className="max-w-full rounded-lg max-h-64 object-contain" />;
+                        if (type.toLowerCase() === 'video') return <video src={url} controls className="max-w-full rounded-lg max-h-64" />;
+                        if (type.toLowerCase() === 'audio') return <audio src={url} controls className="max-w-full" />;
+                      }
+                      return text;
+                    })()}
+                  </div>
                   <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-slate-500">
                     <span>{formatDate(message.fecha_envio)}</span>
                     {message.direccion === 'saliente' && (message.estado_lectura === 'Leido' ? <CheckCheck className="w-3.5 h-3.5 text-sky-500" /> : <Check className="w-3.5 h-3.5" />)}
@@ -679,8 +694,44 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
           </div>
 
           {/* 4. EL FOOTER / INPUT (Fijo) */}
-          <div className="flex-none p-4 border-t border-slate-200 bg-white">
-            <div className="flex gap-3">
+          <div className="flex-none p-4 border-t border-slate-200 bg-white relative">
+            {showPlantillas && (
+              <div className="absolute bottom-full left-4 mb-2 w-80 max-h-64 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-y-auto z-20 flex flex-col custom-scrollbar">
+                <div className="sticky top-0 bg-white border-b border-slate-100 p-3 flex items-center justify-between z-10">
+                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><Zap className="w-4 h-4 text-[#00968f]" /> Respuestas Rápidas</h4>
+                  <button onClick={() => setShowPlantillas(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+                </div>
+                <div className="p-2 space-y-1">
+                  {plantillas.filter(p => p.activa).map(p => (
+                    <button key={p.id} onClick={() => {
+                      let text = p.texto;
+                      text = text.replace(/\{\{\s*nombre\s*\}\}/gi, selected?.nombre || '');
+                      text = text.replace(/\[Nombre\]/gi, selected?.nombre || '[Nombre]');
+                      text = text.replace(/\{\{\s*curso\s*\}\}/gi, selected?.curso_interes || 'el curso');
+                      text = text.replace(/\[Curso\]/gi, selected?.curso_interes || 'el curso');
+                      text = text.replace(/Carrera de Entrenador de Fútbol/gi, selected?.curso_interes || 'el curso');
+                      setDraft(text);
+                      setShowPlantillas(false);
+                    }} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100 group">
+                      <p className="font-bold text-slate-700 text-sm truncate group-hover:text-[#00968f]">{p.titulo}</p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{p.texto}</p>
+                    </button>
+                  ))}
+                  {plantillas.filter(p => p.activa).length === 0 && (
+                    <p className="text-xs text-slate-500 text-center py-4">No hay plantillas activas.</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPlantillas(!showPlantillas)}
+                className="flex-none w-12 h-12 rounded-xl border border-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-50 hover:text-[#00968f] transition-colors"
+                title="Respuestas rápidas"
+                disabled={!selected || !canEdit}
+              >
+                <Zap className="w-5 h-5" />
+              </button>
               <input
                 type="text"
                 value={draft}
