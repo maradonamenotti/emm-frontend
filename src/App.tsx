@@ -33,6 +33,9 @@ import {
   CheckCheck,
   Bell,
   Briefcase,
+  AlertCircle,
+  Send,
+  RefreshCw
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';
@@ -137,6 +140,10 @@ function AppContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [students, setStudents] = useState<StudentData[]>([]);
+  // Broadcast
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [crmPlantillas, setCrmPlantillas] = useState<any[]>([]);
+  const [selectedPlantilla, setSelectedPlantilla] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -892,6 +899,59 @@ function AppContent() {
     });
   };
 
+  const handleOpenBroadcastModal = async () => {
+    if (selectedStudents.length === 0) return;
+    setIsUploading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/crm/plantillas`);
+      if (res.ok) {
+        const data = await res.json();
+        setCrmPlantillas(data.filter((p: any) => p.activa));
+      }
+      setShowBroadcastModal(true);
+    } catch (err) {
+      toast.error('Error al cargar plantillas de WhatsApp');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSendBroadcast = async () => {
+    if (!selectedPlantilla) return toast.error('Selecciona una plantilla');
+    if (selectedStudents.length === 0) return;
+    
+    setConfirmModal({
+      open: true,
+      title: 'Enviar Comunicado WhatsApp',
+      message: `¿Estás seguro de enviar este comunicado a los ${selectedStudents.length} alumnos seleccionados?`,
+      type: 'warning',
+      onConfirm: async () => {
+        setIsUploading(true);
+        try {
+          const res = await fetch(`${API_URL}/api/whatsapp/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studentIds: selectedStudents, plantillaId: selectedPlantilla })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            toast.success(`Comunicado enviado. Éxitos: ${data.sent}, Fallos: ${data.failed}`);
+            setShowBroadcastModal(false);
+            setSelectedPlantilla('');
+            setSelectedStudents([]);
+          } else {
+            toast.error(data.error || 'Error al enviar comunicado');
+          }
+        } catch (err) {
+          toast.error('Error de conexión con el servidor');
+        } finally {
+          setIsUploading(false);
+          setConfirmModal(prev => ({ ...prev, open: false }));
+        }
+      }
+    });
+  };
+
   const handleResetDatabase = async () => {
     setConfirmInput('');
     setConfirmModal({
@@ -1127,13 +1187,6 @@ function AppContent() {
       .catch(() => toast.error('Error al descargar el analítico'));
   };
 
-  /* DESACTIVADO TEMPORALMENTE
-  const downloadDiploma = (student: StudentData) => {
-    if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
-    window.open(`${API_URL}/api/students/${student.id}/diploma`, '_blank');
-  };
-  */
-
   // Descarga el PDF y marca automáticamente como Emitido
   const downloadPDFAndEmit = async (student: StudentData) => {
     if (!student.id) { alert("El alumno no tiene ID registrado."); return; }
@@ -1143,7 +1196,6 @@ function AppContent() {
       return;
     }
 
-    // 1. Descargar Analítico
     // 1. Validar si se puede emitir
     const errors = getAnaliticoErrors(student);
     if (errors.length > 0) {
@@ -1256,7 +1308,7 @@ function AppContent() {
           backgroundImage: `
             radial-gradient(circle at 20% 20%, rgba(15, 90, 92, 0.28), transparent 26%),
             radial-gradient(circle at 80% 10%, rgba(12, 64, 78, 0.38), transparent 22%),
-            radial-gradient(110% 120% at 50% 0%, rgba(4, 18, 24, 0.9), rgba(4, 12, 18, 0.95)),
+            radial-gradient(110% 120% at 50% 0%, rgba(4, 12, 24, 0.9), rgba(4, 12, 18, 0.95)),
             linear-gradient(135deg, #031219 0%, #071f2a 60%, #031017 100%)`,
           backgroundColor: '#041218'
         }}
@@ -1325,7 +1377,7 @@ function AppContent() {
         </motion.div>
       </div>
     );
-  }
+  };
 
   const renderDashboard = () => {
     const totalAlumnos = students.length;
@@ -1875,15 +1927,26 @@ function AppContent() {
                     <span>Reiniciar BD</span>
                   </button>
                   {selectedStudents.length > 0 && (
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={isUploading}
-                      className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title="Eliminar alumnos seleccionados"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Eliminar {selectedStudents.length}</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={handleBulkDelete}
+                        disabled={isUploading}
+                        className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title="Eliminar alumnos seleccionados"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Eliminar {selectedStudents.length}</span>
+                      </button>
+                      <button
+                        onClick={handleOpenBroadcastModal}
+                        disabled={isUploading}
+                        className={`flex items-center gap-2 px-4 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white font-bold rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title="Enviar WhatsApp masivo"
+                      >
+                        <MessageCircle className="w-5 h-5" />
+                        <span>Comunicado a {selectedStudents.length}</span>
+                      </button>
+                    </>
                   )}
                 </>
               )}
@@ -2434,7 +2497,19 @@ function AppContent() {
                             {selectedStudent.email ? `Destino: ${selectedStudent.email}` : 'El alumno no tiene email cargado. Podés copiar el texto y usarlo manualmente.'}
                           </p>
                         </div>
-                        <div className="flex gap-2 shrink-0">
+                        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                          <button
+                            onClick={() => {
+                              const tel = selectedStudent.telefono?.replace(/\D/g, '');
+                              if (tel) window.open(`https://wa.me/${tel}`, '_blank');
+                            }}
+                            disabled={!selectedStudent.telefono}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#25D366]/20 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={selectedStudent.telefono ? `WhatsApp: ${selectedStudent.telefono}` : 'No tiene teléfono cargado'}
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            WhatsApp
+                          </button>
                           <button
                             onClick={() => copyMailContent(selectedStudent)}
                             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 text-sm font-bold transition-colors"
@@ -3396,6 +3471,57 @@ function AppContent() {
         </div>
       )}
 
+      {/* MODAL BROADCAST WHATSAPP */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <MessageCircle className="w-6 h-6 text-[#25D366]" />
+                Comunicado General (WhatsApp)
+              </h2>
+              <button onClick={() => setShowBroadcastModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm flex gap-3 items-start">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <p><strong>Atención:</strong> Vas a enviar un mensaje oficial de Meta a <strong>{selectedStudents.length}</strong> alumnos. Por políticas de WhatsApp, solo puedes enviar <strong>Plantillas Pre-Aprobadas</strong> a contactos con los que no chateaste en las últimas 24hs.</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Selecciona la plantilla a enviar:</label>
+                {crmPlantillas.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                    {crmPlantillas.map(p => (
+                      <label key={p.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${selectedPlantilla === p.id ? 'border-[#25D366] bg-[#25D366]/5' : 'border-slate-200 hover:border-[#25D366]/50 hover:bg-slate-50'}`}>
+                        <input type="radio" name="plantilla" value={p.id} checked={selectedPlantilla === p.id} onChange={() => setSelectedPlantilla(p.id)} className="mt-1 text-[#25D366] focus:ring-[#25D366]" />
+                        <div>
+                          <p className="font-bold text-slate-800">{p.titulo}</p>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.texto}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded-xl border border-slate-100">No tienes plantillas activas en el CRM.</p>
+                )}
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button onClick={() => setShowBroadcastModal(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleSendBroadcast} disabled={!selectedPlantilla || isUploading} className="px-5 py-2.5 rounded-xl font-bold bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center gap-2 shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                {isUploading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                Enviar Comunicado
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {newStudentModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
@@ -3479,7 +3605,6 @@ export default function App() {
       <AppContent />
     </ErrorBoundary>
   );
-}
 
 
 
