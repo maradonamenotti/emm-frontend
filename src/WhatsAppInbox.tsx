@@ -89,10 +89,6 @@ const MESSAGE_PAGE_SIZE = 60;
 
 const sortConversations = (items: WhatsAppConversation[]) => {
   return [...items].sort((a, b) => {
-    const unreadA = a.no_leidos || 0;
-    const unreadB = b.no_leidos || 0;
-    if (unreadA !== unreadB) return unreadB - unreadA;
-
     const dateA = new Date(a.ultimo_mensaje?.fecha_envio || a.fecha_ingreso || 0).getTime();
     const dateB = new Date(b.ultimo_mensaje?.fecha_envio || b.fecha_ingreso || 0).getTime();
     return dateB - dateA;

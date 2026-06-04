@@ -11,6 +11,9 @@ export interface StudentData {
   fecha: string;
   horasPracticas?: string;
   comision?: string;
+  quinttos_id?: number;
+  matricula?: string;
+  datos_extra?: any;
 }
 
 const numberToWords = (n: number): string => {

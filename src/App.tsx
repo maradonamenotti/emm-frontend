@@ -32,6 +32,7 @@ import {
   GraduationCap,
   CheckCheck,
   Bell,
+  Briefcase,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';
@@ -65,6 +66,7 @@ interface StudentData extends BaseStudentData {
   pagos_ok?: boolean;
   documentacion_ok?: boolean;
   historial?: any[];
+  en_analiticos?: boolean;
 }
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -94,7 +96,15 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function AppContent() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://emm-backend-production.up.railway.app';
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alumnos' | 'usuarios' | 'crm-kpis' | 'crm-kanban' | 'crm-lista' | 'crm-wa' | 'crm-plantillas'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'listado-alumnos' | 'analiticos' | 'usuarios' | 'crm-kpis' | 'crm-kanban' | 'crm-lista' | 'crm-wa' | 'crm-plantillas'>(() => {
+    return (localStorage.getItem('mm-active-tab') as any) || 'dashboard';
+  });
+
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem('mm-active-tab', activeTab);
+    }
+  }, [activeTab]);
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('emm-theme') as 'light' | 'dark') || 'light';
@@ -133,6 +143,14 @@ function AppContent() {
   const [comisionFilter, setComisionFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  
+  // Listado de Alumnos (Quinttos)
+  const [listadoSearch, setListadoSearch] = useState('');
+  const [listadoPais, setListadoPais] = useState('all');
+  const [listadoCarrera, setListadoCarrera] = useState('all');
+  const [listadoSituacion, setListadoSituacion] = useState('all');
+  const [listadoExpandedRow, setListadoExpandedRow] = useState<string | null>(null);
+  
   const [backendStatus, setBackendStatus] = useState<'checking' | 'ok' | 'error'>('checking');
   const [importConfig, setImportConfig] = useState<{ isOpen: boolean; mode: 'db' | 'zip' | null }>({ isOpen: false, mode: null });
   const [diplomaModal, setDiplomaModal] = useState<{isOpen: boolean, student: StudentData | null}>({ isOpen: false, student: null });
@@ -350,8 +368,11 @@ function AppContent() {
         const isParsedSuperadmin = parsed.role === 'superadmin';
         const hasAnaliticos = isParsedSuperadmin || (parsed.permissions && parsed.permissions['analiticos'] && parsed.permissions['analiticos'] !== 'none');
 
-        if (!isParsedSuperadmin && hasAnaliticos) {
-          setActiveTab('alumnos');
+        const savedTab = localStorage.getItem('mm-active-tab');
+        if (savedTab) {
+          setActiveTab(savedTab as any);
+        } else if (!isParsedSuperadmin && hasAnaliticos) {
+          setActiveTab('analiticos');
         } else if (isParsedSuperadmin) {
           setActiveTab('dashboard');
         }
@@ -569,6 +590,7 @@ function AppContent() {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('mm-user');
+    localStorage.removeItem('mm-active-tab');
     setEmail('');
     setPassword('');
     setStudents([]);
@@ -728,6 +750,43 @@ function AppContent() {
           toast.error('Error al eliminar notas');
         }
         setConfirmModal(prev => ({ ...prev, open: false }));
+      }
+    });
+  };
+
+  const handleMoveToAnaliticos = async (id?: string) => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${API_URL}/api/students/${id}/analiticos?${getUserQuery()}`, { method: 'PUT' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al mover alumno');
+      toast.success(data.message || 'Alumno movido a analíticos');
+      await fetchStudents();
+    } catch (err: any) {
+      toast.error(err.message || 'Error de conexión');
+    }
+  };
+
+  const handleClearPadron = async () => {
+    setConfirmModal({
+      open: true,
+      title: 'Limpiar Padrón QUINTTOS',
+      message: '¿Estás seguro de que deseas eliminar a todos los alumnos del padrón que no tienen notas ni están en la sección de analíticos? Esta acción no afectará el trabajo ya realizado.',
+      type: 'danger',
+      onConfirm: async (_val: string) => {
+        try {
+          setIsUploading(true);
+          const res = await fetch(`${API_URL}/api/students/padron/clear?${getUserQuery()}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error al limpiar padrón');
+          toast.success(data.message || 'Padrón limpiado correctamente');
+          await fetchStudents();
+        } catch (err: any) {
+          toast.error(err.message || 'Error de conexión');
+        } finally {
+          setIsUploading(false);
+          setConfirmModal(prev => ({ ...prev, open: false }));
+        }
       }
     });
   };
@@ -1170,6 +1229,7 @@ function AppContent() {
   };
 
   const filteredStudents = students.filter(s => {
+    if (!s.en_analiticos) return false;
     const term = searchTerm.toLowerCase();
     const matchesSearch =
       s.nombre.toLowerCase().includes(term) ||
@@ -1545,12 +1605,246 @@ function AppContent() {
     );
   };
 
-  const renderAlumnos = () => (
+  const renderListadoAlumnos = () => {
+    const quinttosStudents = students.filter(s => {
+      // Un alumno viene de Quinttos si tiene datos_extra, quinttos_id, o si su historial lo indica
+      const isFromQuinttos = !!s.datos_extra || !!s.quinttos_id || (Array.isArray(s.historial) && s.historial.some((h: any) => h.accion && h.accion.includes('QUINTTOS')));
+      if (!isFromQuinttos) return false;
+      const sit = s.situacion?.toLowerCase() || '';
+      if (sit === 'preinscripto' || sit === 'inscripto' || sit === 'preinscripta' || sit === 'inscripta') return false;
+      return true;
+    });
+
+    const uniquePaises = Array.from(new Set(quinttosStudents.map(s => s.pais_residencia).filter(Boolean))).sort();
+    const uniqueCarreras = Array.from(new Set(quinttosStudents.map(s => s.carrera_licencia).filter(Boolean))).sort();
+    const uniqueSituaciones = Array.from(new Set(quinttosStudents.map(s => s.situacion).filter(Boolean))).sort();
+
+    const listadoFiltered = quinttosStudents.filter(s => {
+      if (listadoPais !== 'all' && s.pais_residencia !== listadoPais) return false;
+      if (listadoCarrera !== 'all' && s.carrera_licencia !== listadoCarrera) return false;
+      if (listadoSituacion !== 'all' && s.situacion !== listadoSituacion) return false;
+      
+      if (listadoSearch) {
+        const q = listadoSearch.toLowerCase();
+        const match = [
+          s.nombre, s.apellido, s.documento, s.quinttos_id?.toString(), s.matricula
+        ].some(val => val && val.toLowerCase().includes(q));
+        if (!match) return false;
+      }
+      return true;
+    });
+
+    const currentListado = listadoFiltered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalPages = Math.ceil(listadoFiltered.length / itemsPerPage) || 1;
+
+    return (
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Listado de Alumnos</h2>
+            <p className="text-slate-500 text-sm">Importación y listado de alumnos del padrón general.</p>
+          </div>
+          <div className="flex items-center justify-end gap-3 flex-wrap">
+            {(isSuperadmin || canEditAnaliticos) && (
+              <>
+                <button
+                  onClick={handleClearPadron}
+                  disabled={isUploading}
+                  className={`flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Limpiar Padrón</span>
+                </button>
+                <label className={`flex items-center gap-2 px-4 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white font-medium rounded-xl cursor-pointer transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <Upload className="w-4 h-4" />
+                  <span>Sincronizar QUINTTOS</span>
+                  <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQuinttosUpload} disabled={isUploading} />
+                </label>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-3 mb-3 items-stretch">
+            <div className="relative shadow-sm rounded-xl col-span-1 xl:col-span-1 min-w-0">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Buscar (Nombre, DNI, Matrícula)..."
+                value={listadoSearch}
+                onChange={(e) => setListadoSearch(e.target.value)}
+                className="w-full h-14 pl-12 pr-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium"
+              />
+            </div>
+            <select
+              value={listadoPais}
+              onChange={(e) => setListadoPais(e.target.value)}
+              className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value="all">Todos los Países</option>
+              {uniquePaises.map(p => <option key={p as string} value={p as string}>{p}</option>)}
+            </select>
+            <select
+              value={listadoCarrera}
+              onChange={(e) => setListadoCarrera(e.target.value)}
+              className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value="all">Todas las Carreras</option>
+              {uniqueCarreras.map(c => <option key={c as string} value={c as string}>{c}</option>)}
+            </select>
+            <select
+              value={listadoSituacion}
+              onChange={(e) => setListadoSituacion(e.target.value)}
+              className="min-w-0 h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none transition-all bg-white font-medium text-slate-700 cursor-pointer shadow-sm"
+            >
+              <option value="all">Todas las Situaciones</option>
+              {uniqueSituaciones.map(s => <option key={s as string} value={s as string}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
+                    <th className="px-6 py-4">Documento</th>
+                    <th className="px-6 py-4">Apellido</th>
+                    <th className="px-6 py-4">Nombre</th>
+                    <th className="px-6 py-4">País</th>
+                    <th className="px-6 py-4">Matrícula</th>
+                    <th className="px-6 py-4">Carrera</th>
+                    <th className="px-6 py-4">Situación</th>
+                    <th className="px-6 py-4">Analítico</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentListado.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                        No hay alumnos que coincidan con la búsqueda.
+                      </td>
+                    </tr>
+                  ) : currentListado.map(student => (
+                    <React.Fragment key={student.id}>
+                      <tr 
+                        className={`hover:bg-slate-50 transition-colors cursor-pointer ${listadoExpandedRow === student.id ? 'bg-[#0ffff4]/10' : ''}`}
+                        onClick={() => setListadoExpandedRow(listadoExpandedRow === student.id ? null : (student.id as string))}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          {student.documento || student.dni || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">
+                          {student.apellido}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          {student.nombre}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          {student.pais_residencia || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">
+                          {student.matricula || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-medium border border-slate-200">
+                            {student.carrera_licencia || '-'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                            student.situacion?.toLowerCase() === 'baja' ? 'bg-red-50 text-red-600 border-red-200' :
+                            student.situacion?.toLowerCase() === 'pendiente' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                            student.situacion?.toLowerCase() === 'alumno regular' ? 'bg-[#00968f]/10 text-[#00968f] border-[#00968f]/20 font-bold' :
+                            student.situacion?.toLowerCase() === 'duplicado' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                            'border-slate-200 bg-slate-50 text-slate-700'
+                          }`}>
+                            {student.situacion || '-'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {student.estado_analitico === 'emitido' ? (
+                            <span className="px-2 py-1 rounded text-xs font-bold border border-emerald-200 bg-emerald-50 text-emerald-700">Emitido</span>
+                          ) : (
+                            <span className="px-2 py-1 rounded text-xs font-medium border border-slate-200 bg-slate-50 text-slate-500">No Emitido</span>
+                          )}
+                        </td>
+                      </tr>
+                      {listadoExpandedRow === student.id && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={8} className="p-0 border-b-2 border-[#00968f]">
+                            <div className="p-6 animate-in slide-in-from-top-2 duration-200">
+                              <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-2">
+                                <h3 className="text-sm font-bold text-[#002d2b] uppercase tracking-wider">
+                                  Toda la información registrada en QUINTTOS
+                                </h3>
+                                {!student.en_analiticos && (
+                                  <button
+                                    onClick={() => handleMoveToAnaliticos(student.id)}
+                                    className="px-3 py-1.5 bg-[#00968f] hover:bg-[#007a75] text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+                                  >
+                                    Mover a Analíticos
+                                  </button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {student.datos_extra ? Object.entries(student.datos_extra).map(([key, value]) => (
+                                  <div key={key} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                                    <span className="block text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">{key}</span>
+                                    <span className="block text-sm text-slate-900 break-words">{String(value || '-')}</span>
+                                  </div>
+                                )) : (
+                                  <div className="col-span-full text-slate-500 text-sm italic">
+                                    No hay datos extra guardados para este alumno.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50">
+              <span className="text-sm text-slate-500 font-medium">
+                Mostrando <span className="font-bold text-slate-900">{currentListado.length}</span> de <span className="font-bold text-slate-900">{listadoFiltered.length}</span> resultados
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-white text-sm font-medium text-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  Anterior
+                </button>
+                <div className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-[#00968f] shadow-sm">
+                  {currentPage} / {totalPages}
+                </div>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-white text-sm font-medium text-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAnaliticos = () => (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Alumnos</h2>
-          <p className="text-slate-500 text-sm">Aca se gestionan todos los alumnos de Titulos: los sincronizados desde QUINTTOS y los creados manualmente.</p>
+          <h2 className="text-xl font-bold text-slate-900">Gestión de Analíticos</h2>
+          <p className="text-slate-500 text-sm">Carga de notas, legajos y emisión de certificados.</p>
         </div>
 
         <div className="flex items-center justify-end gap-3 flex-wrap">
@@ -1591,11 +1885,7 @@ function AppContent() {
                   )}
                 </>
               )}
-              <label className={`flex items-center gap-2 px-4 py-3 bg-[#002d2b] hover:bg-[#00968f] text-white font-medium rounded-xl cursor-pointer transition-all shadow hover:-translate-y-0.5 active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <Upload className="w-4 h-4" />
-                <span>Sincronizar QUINTTOS</span>
-                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleQuinttosUpload} disabled={isUploading} />
-              </label>
+
               <button onClick={() => setImportConfig({ isOpen: true, mode: 'db' })} disabled={isUploading} className={`flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all shadow ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Upload className="w-4 h-4" />
                 <span>Importar Notas</span>
@@ -2726,7 +3016,12 @@ function AppContent() {
           {/* DASHBOARD GENERAL */}
           {user.role !== 'student' && (isSuperadmin || hasAnaliticosAccess || hasCrmAccess) && (
             <div className="space-y-1">
-              {!sidebarCollapsed && <p className="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 mb-1 mt-1">General</p>}
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-1.5 px-3 mb-1 mt-1 text-[#0ffff4]/60">
+                  <LayoutDashboard className="w-3 h-3" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em]">General</p>
+                </div>
+              )}
               <button
                 onClick={() => setActiveTab('dashboard')}
                 title="Dashboard General"
@@ -2747,7 +3042,10 @@ function AppContent() {
                   onClick={() => setAnaliticosExpanded(e => !e)}
                   className="w-full flex items-center justify-between px-3 py-1 mt-3 mb-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5 group"
                 >
-                  <span>ANALÍTICOS</span>
+                  <div className="flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>ALUMNOS</span>
+                  </div>
                   <ChevronDown
                     className="w-3 h-3 transition-transform duration-200"
                     style={{ transform: analiticosExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
@@ -2761,12 +3059,20 @@ function AppContent() {
               {(analiticosExpanded || sidebarCollapsed) && (
                 <div className={`space-y-0.5 ${!sidebarCollapsed ? 'pl-2 border-l border-white/10 ml-3' : ''}`}>
                   <button
-                    onClick={() => setActiveTab('alumnos')}
-                    title="Alumnos"
-                    className={`sidebar-link ${activeTab === 'alumnos' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}
+                    onClick={() => setActiveTab('listado-alumnos')}
+                    title="Listado de Alumnos"
+                    className={`sidebar-link ${activeTab === 'listado-alumnos' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}
                   >
-                    <Users className="w-4 h-4 shrink-0" />
-                    {!sidebarCollapsed && <span className="truncate">Alumnos</span>}
+                    <List className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">Listado de Alumnos</span>}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('analiticos')}
+                    title="Analíticos"
+                    className={`sidebar-link ${activeTab === 'analiticos' ? 'sidebar-link-active' : 'sidebar-link-inactive'}`}
+                  >
+                    <FileText className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">Analíticos</span>}
                   </button>
                 </div>
               )}
@@ -2782,7 +3088,10 @@ function AppContent() {
                   onClick={() => setCrmExpanded(e => !e)}
                   className="w-full flex items-center justify-between px-3 py-1 mt-3 mb-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#0ffff4]/60 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5 group"
                 >
-                  <span>CRM</span>
+                  <div className="flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    <span>CRM</span>
+                  </div>
                   <ChevronDown
                     className="w-3 h-3 transition-transform duration-200"
                     style={{ transform: crmExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
@@ -2927,7 +3236,8 @@ function AppContent() {
           <header className="h-16 bg-white/90 backdrop-blur-xl border-b border-[#00968f26] px-8 flex items-center shrink-0 shadow-sm">
             <h1 className="text-slate-900 text-xl font-black tracking-tight">
               {activeTab === 'dashboard' ? 'Módulo Analíticos: Panel de Control' :
-               activeTab === 'alumnos' ? 'Padrón de Alumnos' :
+               activeTab === 'listado-alumnos' ? 'Listado de Alumnos' :
+               activeTab === 'analiticos' ? 'Gestión de Analíticos' :
                activeTab === 'usuarios' ? 'Gestión de Usuarios' :
                activeTab === 'crm-kpis' ? 'CRM — KPIs & Pipeline' :
                activeTab === 'crm-kanban' ? 'CRM — Vista Kanban' :
@@ -2965,7 +3275,8 @@ function AppContent() {
             <div className="max-w-7xl mx-auto pb-12">
               {activeTab === 'dashboard' ? renderDashboard() :
                activeTab === 'usuarios' ? renderUsuarios() :
-               renderAlumnos()}
+               activeTab === 'listado-alumnos' ? renderListadoAlumnos() :
+               renderAnaliticos()}
             </div>
           </main>
         )}
