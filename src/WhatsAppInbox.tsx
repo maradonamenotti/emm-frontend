@@ -138,6 +138,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   const selected = useMemo(() => conversations.find(item => item.id === selectedId) || null, [conversations, selectedId]);
 
   const [showPlantillas, setShowPlantillas] = useState(false);
+  const [hideClosed, setHideClosed] = useState(false);
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -515,6 +516,9 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
             <p className="text-xs text-slate-500">{conversations.length}{hasMoreConversations ? '+' : ''} conversaciones</p>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={() => setHideClosed(!hideClosed)} className={`px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 ${hideClosed ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`} title="Ocultar descartados e inscriptos">
+              {hideClosed ? 'Limpios' : 'Todos'}
+            </button>
             <button onClick={logout} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600" title="Cerrar Sesión / Reset">
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -534,7 +538,11 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
             </div>
           ) : (
             <>
-              {conversations.map(conversation => {
+              {conversations.filter(c => {
+                if (!hideClosed) return true;
+                const est = c.estado?.toLowerCase() || '';
+                return !est.includes('descartado') && !est.includes('perdido') && !est.includes('inscripto');
+              }).map(conversation => {
                 const unread = conversation.no_leidos || 0;
                 return (
                 <button
