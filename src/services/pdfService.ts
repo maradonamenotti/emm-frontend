@@ -13,11 +13,11 @@ export interface StudentData {
   comision?: string;
   quinttos_id?: number;
   matricula?: string;
+  telefono?: string;
   datos_extra?: any;
 }
 
 const numberToWords = (n: number): string => {
-  const words: Record<number, string> = {
     0: "CERO", 1: "UNO", 2: "DOS", 3: "TRES", 4: "CUATRO",
     5: "CINCO", 6: "SEIS", 7: "SIETE", 8: "OCHO", 9: "NUEVE", 10: "DIEZ"
   };
