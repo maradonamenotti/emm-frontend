@@ -59,6 +59,8 @@ interface StudentData extends BaseStudentData {
   carrera_licencia?: string;
   comision?: string;
   situacion?: string;
+  documento?: string;
+  pais_residencia?: string;
   estado_analitico?: 'borrador' | 'emitido';
   diploma_emitido?: boolean;
   fecha_emision?: string;
@@ -436,7 +438,7 @@ function AppContent() {
       const hasAnaliticos = isDataSuperadmin || (data.permissions && data.permissions['analiticos'] && data.permissions['analiticos'] !== 'none');
 
       if (!isDataSuperadmin && hasAnaliticos) {
-        setActiveTab('alumnos');
+        setActiveTab('listado-alumnos');
       } else {
         setActiveTab('dashboard');
       }
