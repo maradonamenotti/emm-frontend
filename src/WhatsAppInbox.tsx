@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Plantilla } from './CrmModule';
+import type { Plantilla } from './CrmModule';
 
 interface WhatsAppMessage {
   id_mensaje: string;
