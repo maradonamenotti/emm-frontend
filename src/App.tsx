@@ -2960,6 +2960,32 @@ function AppContent() {
                     </select>
                   )}
                 </div>
+
+                {/* Modulo CRM */}
+                <div className={`p-4 rounded-xl border transition-all ${newUserPermissions['crm'] !== 'none' && newUserPermissions['crm'] !== undefined ? 'border-[#0ffff4] bg-[#0ffff4]/5' : 'border-slate-100 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-5 h-5 text-slate-400" />
+                      <span className="font-bold text-slate-700">Módulo CRM</span>
+                    </div>
+                    <button 
+                      onClick={() => togglePermission('crm')}
+                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase transition-all ${newUserPermissions['crm'] !== 'none' && newUserPermissions['crm'] !== undefined ? 'bg-[#002d2b] text-white' : 'bg-slate-200 text-slate-500'}`}
+                    >
+                      {newUserPermissions['crm'] !== 'none' && newUserPermissions['crm'] !== undefined ? 'Habilitado' : 'Deshabilitado'}
+                    </button>
+                  </div>
+                  {newUserPermissions['crm'] !== 'none' && newUserPermissions['crm'] !== undefined && (
+                    <select
+                      value={newUserPermissions['crm']}
+                      onChange={e => updateModuleRole('crm', e.target.value)}
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-[#00968f]"
+                    >
+                      <option value="viewer">Solo Lectura (Viewer)</option>
+                      <option value="editor">Edición (Editor)</option>
+                    </select>
+                  )}
+                </div>
               </div>
             </div>
           )}
