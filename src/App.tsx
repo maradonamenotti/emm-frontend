@@ -35,7 +35,8 @@ import {
   Briefcase,
   AlertCircle,
   Send,
-  RefreshCw
+  RefreshCw,
+  Target
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { type StudentData as BaseStudentData, getSubjectsByLicencia } from './services/pdfService';

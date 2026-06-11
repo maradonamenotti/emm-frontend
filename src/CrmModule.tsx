@@ -545,6 +545,87 @@ function MotivoPerdidaModal({ onClose, onConfirm }: { onClose: () => void, onCon
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MODAL IMPORTAR EXCEL
+// ═══════════════════════════════════════════════════════════════════════════════
+function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: string; config: CrmConfig; onClose: () => void; onSuccess: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [curso, setCurso] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return toast.error('Selecciona un archivo Excel');
+    if (!curso) return toast.error('Selecciona un curso para asignar a estos leads');
+
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('curso', curso);
+
+    try {
+      const r = await fetch(`${apiUrl}/api/crm/prospectos/importar-excel`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (r.ok) {
+        const data = await r.json();
+        toast.success(data.message || 'Importación completada');
+        onSuccess();
+      } else {
+        const err = await r.json();
+        toast.error(err.message || 'Error en la importación');
+      }
+    } catch (error) {
+      toast.error('Error de red al importar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-emerald-50/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><Download className="w-5 h-5 rotate-180" /></div>
+            <h3 className="text-lg font-bold text-slate-900">Importar desde Excel</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <p className="text-sm text-slate-600 mb-2">
+            El archivo debe tener las columnas (o similares): <br/>
+            <b>NOMBRE COMPLETO, EMAIL, WHATSAPP_NUMBER</b>
+          </p>
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Archivo Excel (.xlsx, .csv)</label>
+            <input 
+              type="file" 
+              accept=".xlsx,.xls,.csv" 
+              onChange={e => setFile(e.target.files?.[0] || null)} 
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" 
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Asignar al Curso de Interés</label>
+            <select value={curso} onChange={e => setCurso(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+              <option value="">Seleccione el curso...</option>
+              {config.cursos.map(c => <option key={c.id} value={c.valor}>{c.valor}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all">Cancelar</button>
+            <button disabled={loading} type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg">
+              {loading ? 'Importando...' : 'Importar Ahora'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD KPIs
 // ═══════════════════════════════════════════════════════════════════════════════
 function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null; config: CrmConfig; onOpenProspecto: (id: string) => void }) {
