@@ -4,7 +4,7 @@ import {
   ChevronDown, Settings, Download, Bell, Edit2, Trash2,
   Check, MessageCircle, Calendar, Search, Filter, RefreshCw,
   TrendingUp, Target, UserCheck, Copy, CheckCheck,
-  Globe, GraduationCap, Info
+  Globe, GraduationCap, Info, Ghost
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WhatsAppInbox from './WhatsAppInbox';
@@ -51,6 +51,7 @@ interface Stats {
   tasaConversion: number;
   porEstado: { estado: string; color: string; es_ganado: boolean; es_perdido: boolean; count: number }[];
   porOrigen: { origen: string; color: string; count: number }[];
+  motivosPerdida: { motivo: string; count: number }[];
   alertasSeguimiento: { id: string; prospecto_id: string; nombre: string; telefono?: string; fecha_proximo_aviso: string; nota?: string }[];
 }
 type SubView = 'dashboard' | 'kanban' | 'lista' | 'whatsapp' | 'plantillas';
@@ -186,6 +187,8 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
   const [showConfig, setShowConfig] = useState(false);
   const [showNewProspecto, setShowNewProspecto] = useState(false);
   const [selectedProspecto, setSelectedProspecto] = useState<Prospecto | null>(null);
+  const [lossModal, setLossModal] = useState<{ id: string, estado: string } | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [waInitialId, setWaInitialId] = useState<string | undefined>();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -282,18 +285,22 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
     window.open(`${apiUrl}/api/crm/export?${params}`, '_blank');
   };
 
-  const handleUpdateEstado = async (id: string, estado: string) => {
+  const handleUpdateEstado = async (id: string, estado: string, motivo?: string) => {
     // Confirmar si es un estado terminal
     const estadoConfig = config.estados.find(e => e.valor === estado);
-    if (estadoConfig && (estadoConfig.es_ganado || estadoConfig.es_perdido)) {
-      const icono = estadoConfig.es_ganado ? '🎉' : '⚠️';
-      const msg = estadoConfig.es_ganado
-        ? `${icono} ¿Confirmar como INSCRIPTO? Esta acción marca al prospecto como convertido.`
-        : `${icono} ¿Confirmar como DESCARTADO? Esta acción marca al prospecto como perdido.`;
-      if (!window.confirm(msg)) return;
+    if (estadoConfig && estadoConfig.es_perdido && !motivo) {
+        setLossModal({ id, estado });
+        return;
     }
+    if (estadoConfig && estadoConfig.es_ganado) {
+      if (!window.confirm(`🎉 ¿Confirmar como INSCRIPTO? Esta acción marca al prospecto como convertido.`)) return;
+    }
+    
+    const body: any = { estado };
+    if (motivo) body.motivo_perdida = motivo;
+
     const r = await fetch(`${apiUrl}/api/crm/prospectos/${id}/estado`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado })
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
     if (r.ok) {
       setProspectos(prev => prev.map(p => p.id === id ? { ...p, estado } : p));
@@ -311,6 +318,19 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
     if (selectedProspecto?.id === id) setSelectedProspecto(null);
     fetchStats();
     toast.success('Prospecto eliminado');
+  };
+
+  const handleLimpiarFantasmas = async () => {
+    if (!confirm('¿Descartar a todos los prospectos fantasma (sin email ni teléfono) para limpiar la base?')) return;
+    const toastId = toast.loading('Limpiando fantasmas...');
+    const r = await fetch(`${apiUrl}/api/crm/prospectos/limpiar-fantasmas`, { method: 'POST' });
+    if (r.ok) {
+      const data = await r.json();
+      toast.success(`¡Se limpiaron ${data.count} prospectos fantasma!`, { id: toastId });
+      refreshAll();
+    } else {
+      toast.error('Error al limpiar fantasmas', { id: toastId });
+    }
   };
 
   const openProspecto = async (id: string) => {
@@ -350,6 +370,16 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
             <p className="text-slate-500 text-sm mt-0.5">Gestión de leads y seguimiento comercial</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {canEdit && (
+              <button onClick={handleLimpiarFantasmas} className="flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
+                <Ghost className="w-4 h-4" /> Limpiar Fantasmas
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={() => setShowImport(true)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
+                <Download className="w-4 h-4 rotate-180" /> Importar
+              </button>
+            )}
             <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm transition-all shadow hover:-translate-y-0.5">
               <Download className="w-4 h-4" /> Exportar Excel
             </button>
@@ -432,6 +462,84 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
       {showConfig && (
         <ConfigModal config={config} apiUrl={apiUrl} onClose={() => { setShowConfig(false); fetchConfig(); }} />
       )}
+
+      {showImport && (
+        <ImportarExcelModal 
+          apiUrl={apiUrl}
+          config={config}
+          onClose={() => setShowImport(false)}
+          onSuccess={() => { setShowImport(false); refreshAll(); }}
+        />
+      )}
+
+      {lossModal && (
+        <MotivoPerdidaModal 
+          onClose={() => setLossModal(null)} 
+          onConfirm={(motivo) => {
+            handleUpdateEstado(lossModal.id, lossModal.estado, motivo);
+            setLossModal(null);
+          }} 
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODAL MOTIVO PÉRDIDA
+// ═══════════════════════════════════════════════════════════════════════════════
+function MotivoPerdidaModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (motivo: string) => void }) {
+  const [motivo, setMotivo] = useState('Precio muy alto / Falta de dinero');
+  const [customMotivo, setCustomMotivo] = useState('');
+
+  const MOTIVOS = [
+    'Precio muy alto / Falta de dinero',
+    'No le sirven los horarios',
+    'Buscaba otra carrera/curso',
+    'No cumple los requisitos previos',
+    'Decidió estudiar en otro lado',
+    'Dejó de responder (Ghosting)',
+    'Solo estaba curioseando',
+    'Otro (Especificar)'
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalMotivo = motivo === 'Otro (Especificar)' ? customMotivo : motivo;
+    if (!finalMotivo.trim()) return toast.error('Debes especificar un motivo');
+    onConfirm(finalMotivo);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-red-50/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-100 text-red-600 rounded-lg"><Trash2 className="w-5 h-5" /></div>
+            <h3 className="text-lg font-bold text-slate-900">Descartar Prospecto</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <p className="text-sm text-slate-600 mb-2">Para mantener las estadísticas limpias, indicanos por qué se perdió este prospecto:</p>
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Motivo principal</label>
+            <select value={motivo} onChange={e => setMotivo(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+              {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          {motivo === 'Otro (Especificar)' && (
+            <div className="animate-in fade-in slide-in-from-top-2">
+              <label className="text-xs font-bold text-slate-500 block mb-1">Especificar motivo</label>
+              <input autoFocus required value={customMotivo} onChange={e => setCustomMotivo(e.target.value)} placeholder="Ej: Quería modalidad presencial en vez de online" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all">Cancelar</button>
+            <button type="submit" className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg">Confirmar Descarte</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -511,7 +619,7 @@ function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Funnel */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
@@ -554,6 +662,31 @@ function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null
             ))}
             {stats.porOrigen.every(o => o.count === 0) && (
               <p className="text-slate-400 text-sm text-center py-8">Sin datos aún</p>
+            )}
+          </div>
+        </div>
+
+        {/* Motivos de Pérdida */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
+            <Trash2 className="w-5 h-5 text-red-500" /> Motivos de Pérdida
+          </h3>
+          <div className="space-y-3">
+            {stats.motivosPerdida?.filter(m => m.count > 0).map((m, i) => {
+              const maxMotivos = Math.max(...(stats.motivosPerdida?.map(x => x.count) || [1]), 1);
+              return (
+              <div key={i}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-semibold text-slate-700 truncate mr-2">{m.motivo}</span>
+                  <span className="font-bold text-slate-900 shrink-0">{m.count} <span className="text-slate-400 font-normal">({stats.descartados > 0 ? Math.round(m.count / stats.descartados * 100) : 0}%)</span></span>
+                </div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-700 bg-red-400" style={{ width: `${(m.count / maxMotivos) * 100}%` }} />
+                </div>
+              </div>
+            )})}
+            {(!stats.motivosPerdida || stats.motivosPerdida.every(m => m.count === 0)) && (
+              <p className="text-slate-400 text-sm text-center py-8">Sin descartes con motivo aún</p>
             )}
           </div>
         </div>

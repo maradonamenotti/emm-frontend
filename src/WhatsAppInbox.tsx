@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Plantilla } from './CrmModule';
 
@@ -139,6 +139,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
 
   const [showPlantillas, setShowPlantillas] = useState(false);
   const [hideClosed, setHideClosed] = useState(false);
+  const [filterOrigen, setFilterOrigen] = useState('Todos');
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -154,6 +155,12 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   const messageRequestRef = useRef(0);
   const loadingMoreConversationsRef = useRef(false);
   const loadingOlderMessagesRef = useRef(false);
+
+  const availableOrigins = useMemo(() => {
+    const origins = new Set<string>();
+    conversations.forEach(c => c.origen && origins.add(c.origen));
+    return Array.from(origins).sort();
+  }, [conversations]);
 
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
@@ -516,11 +523,22 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
             <p className="text-xs text-slate-500">{conversations.length}{hasMoreConversations ? '+' : ''} conversaciones</p>
           </div>
           <div className="flex items-center gap-1">
+            <select
+              value={filterOrigen}
+              onChange={e => setFilterOrigen(e.target.value)}
+              className="px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200 outline-none max-w-[120px] truncate cursor-pointer"
+              title="Filtrar por origen"
+            >
+              <option value="Todos">Todos</option>
+              {availableOrigins.map(orig => (
+                <option key={orig} value={orig}>{orig}</option>
+              ))}
+            </select>
             <button onClick={() => setHideClosed(!hideClosed)} className={`px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 ${hideClosed ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`} title="Ocultar descartados e inscriptos">
-              {hideClosed ? 'Limpios' : 'Todos'}
+              {hideClosed ? 'Limpios' : 'Abiertos'}
             </button>
             <button onClick={logout} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600" title="Cerrar Sesión / Reset">
-              <RefreshCw className="w-4 h-4" />
+              <LogOut className="w-4 h-4" />
             </button>
             <button onClick={() => loadConversations(true)} className="p-2 rounded-lg text-slate-500 hover:bg-white hover:text-[#00968f]" title="Actualizar">
               <RefreshCw className="w-4 h-4" />
@@ -539,9 +557,14 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
           ) : (
             <>
               {conversations.filter(c => {
-                if (!hideClosed) return true;
-                const est = c.estado?.toLowerCase() || '';
-                return !est.includes('descartado') && !est.includes('perdido') && !est.includes('inscripto');
+                if (hideClosed) {
+                  const est = c.estado?.toLowerCase() || '';
+                  if (est.includes('descartado') || est.includes('perdido') || est.includes('inscripto')) return false;
+                }
+                if (filterOrigen !== 'Todos' && c.origen !== filterOrigen) {
+                  return false;
+                }
+                return true;
               }).map(conversation => {
                 const unread = conversation.no_leidos || 0;
                 return (
