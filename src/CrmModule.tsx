@@ -4,7 +4,7 @@ import {
   ChevronDown, Settings, Download, Bell, Edit2, Trash2,
   Check, MessageCircle, Calendar, Search, Filter, RefreshCw,
   TrendingUp, Target, UserCheck, Copy, CheckCheck,
-  Globe, GraduationCap, Info, Ghost
+  Globe, GraduationCap, Info, Ghost, Instagram
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WhatsAppInbox from './WhatsAppInbox';
@@ -196,6 +196,8 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
   const [filterOrigen, setFilterOrigen] = useState('');
   const [filterAsignado, setFilterAsignado] = useState('');
   const [filterCurso, setFilterCurso] = useState('');
+  const [hideGhosts, setHideGhosts] = useState(true);
+  const [hideComments, setHideComments] = useState(true);
 
   const fetchConfig = useCallback(async () => {
     const r = await fetch(`${apiUrl}/api/crm/config`);
@@ -339,6 +341,8 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
   };
 
   const filtered = prospectos.filter(p => {
+    if (hideGhosts && !p.telefono && !p.email) return false;
+    if (hideComments && p.origen === 'Instagram - Comentario') return false;
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
@@ -408,8 +412,8 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
       ) : (
         <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pb-4">
           {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={async (id) => { await openProspecto(id); onNavigate?.('lista'); }} />}
-          {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />}
-          {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} filterCurso={filterCurso} setFilterCurso={setFilterCurso} />}
+          {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} />}
+          {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} filterCurso={filterCurso} setFilterCurso={setFilterCurso} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} />}
           {subView === 'plantillas' && <PlantillasView plantillas={plantillas} config={config} canEdit={canEdit} apiUrl={apiUrl} onRefresh={fetchPlantillas} />}
         </div>
       )}
@@ -1076,11 +1080,13 @@ function KanbanDroppableColumn({ estado, col, collapsedCols, setCollapsedCols, c
   );
 }
 
-function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searchTerm, setSearchTerm }: {
+function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searchTerm, setSearchTerm, hideGhosts, setHideGhosts, hideComments, setHideComments }: {
   prospectos: Prospecto[]; config: CrmConfig; canEdit: boolean;
   onEstadoChange: (id: string, estado: string) => void;
   onOpen: (id: string) => void; onDelete: (id: string) => void;
   searchTerm: string; setSearchTerm: (v: string) => void;
+  hideGhosts: boolean; setHideGhosts: (v: boolean) => void;
+  hideComments: boolean; setHideComments: (v: boolean) => void;
 }) {
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(new Set(['Descartado']));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1129,9 +1135,37 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Nombre, teléfono, email..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none text-sm" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-sm flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Nombre, teléfono, email..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none text-sm" />
+        </div>
+        
+        <button
+          onClick={() => setHideGhosts(!hideGhosts)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+            hideGhosts
+              ? 'bg-red-50 text-red-700 border-red-200 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+          }`}
+          title="Ocultar prospectos que no tienen teléfono ni email"
+        >
+          <Ghost className="w-3.5 h-3.5" />
+          {hideGhosts ? 'Sin Contacto Ocultos' : 'Mostrar Sin Contacto'}
+        </button>
+
+        <button
+          onClick={() => setHideComments(!hideComments)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+            hideComments
+              ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+          }`}
+          title="Ocultar comentarios de Instagram"
+        >
+          <Instagram className="w-3.5 h-3.5" />
+          {hideComments ? 'Comentarios IG Ocultos' : 'Mostrar Comentarios IG'}
+        </button>
       </div>
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
@@ -1161,7 +1195,7 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
 // ═══════════════════════════════════════════════════════════════════════════════
 // LISTA
 // ═══════════════════════════════════════════════════════════════════════════════
-function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDelete, searchTerm, setSearchTerm, filterEstado, setFilterEstado, filterOrigen, setFilterOrigen, filterAsignado, setFilterAsignado, filterCurso, setFilterCurso }: any) {
+function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDelete, searchTerm, setSearchTerm, filterEstado, setFilterEstado, filterOrigen, setFilterOrigen, filterAsignado, setFilterAsignado, filterCurso, setFilterCurso, hideGhosts, setHideGhosts, hideComments, setHideComments }: any) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   return (
@@ -1222,6 +1256,32 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
           <option value="">Todos los cursos</option>
           {config.cursos.map((c: CrmConfigItem) => <option key={c.id} value={c.valor}>{c.valor}</option>)}
         </select>
+        <button
+          onClick={() => setHideGhosts(!hideGhosts)}
+          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+            hideGhosts
+              ? 'bg-red-50 text-red-700 border-red-200 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+          }`}
+          title="Ocultar prospectos que no tienen teléfono ni email"
+        >
+          <Ghost className="w-3.5 h-3.5" />
+          {hideGhosts ? 'Sin Contacto Ocultos' : 'Mostrar Sin Contacto'}
+        </button>
+
+        <button
+          onClick={() => setHideComments(!hideComments)}
+          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+            hideComments
+              ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+          }`}
+          title="Ocultar comentarios de Instagram"
+        >
+          <Instagram className="w-3.5 h-3.5" />
+          {hideComments ? 'Comentarios IG Ocultos' : 'Mostrar Comentarios IG'}
+        </button>
+
         {(filterEstado || filterOrigen || filterAsignado || filterCurso || searchTerm) && (
           <button onClick={() => { setFilterEstado(''); setFilterOrigen(''); setFilterAsignado(''); setFilterCurso(''); setSearchTerm(''); }} className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold flex items-center gap-1">
             <X className="w-3.5 h-3.5" /> Limpiar

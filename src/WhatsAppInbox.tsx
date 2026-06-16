@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Plantilla } from './CrmModule';
 
@@ -139,6 +139,8 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
 
   const [showPlantillas, setShowPlantillas] = useState(false);
   const [hideClosed, setHideClosed] = useState(false);
+  const [hideComments, setHideComments] = useState(true);
+  const [hideGhosts, setHideGhosts] = useState(false);
   const [filterOrigen, setFilterOrigen] = useState('Todos');
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
@@ -517,31 +519,47 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   return (
     <div className="h-full grid grid-cols-[340px_minmax(0,1fr)] bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl">
       <section className="border-r border-slate-200 flex flex-col min-w-0 min-h-0">
-        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-200 bg-slate-50">
-          <div>
-            <h3 className="text-base font-black text-slate-900">Bandeja de Entrada</h3>
-            <p className="text-xs text-slate-500">{conversations.length}{hasMoreConversations ? '+' : ''} conversaciones</p>
+        <div className="flex flex-col gap-2.5 py-3 px-5 border-b border-slate-200 bg-slate-50 flex-none">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-black text-slate-900">Bandeja de Entrada</h3>
+              <p className="text-xs text-slate-500">{conversations.length}{hasMoreConversations ? '+' : ''} conversaciones</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={logout} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600" title="Cerrar Sesión / Reset">
+                <LogOut className="w-4 h-4" />
+              </button>
+              <button onClick={() => loadConversations(true)} className="p-2 rounded-lg text-slate-500 hover:bg-white hover:text-[#00968f]" title="Actualizar">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
+
+          <div className="flex items-center gap-1.5 flex-wrap">
             <select
               value={filterOrigen}
               onChange={e => setFilterOrigen(e.target.value)}
-              className="px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200 outline-none max-w-[120px] truncate cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 outline-none max-w-[100px] truncate cursor-pointer border border-slate-200"
               title="Filtrar por origen"
             >
-              <option value="Todos">Todos</option>
+              <option value="Todos">Orígenes</option>
               {availableOrigins.map(orig => (
                 <option key={orig} value={orig}>{orig}</option>
               ))}
             </select>
-            <button onClick={() => setHideClosed(!hideClosed)} className={`px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 ${hideClosed ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`} title="Ocultar descartados e inscriptos">
+            
+            <button onClick={() => setHideClosed(!hideClosed)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${hideClosed ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Ocultar descartados e inscriptos">
               {hideClosed ? 'Limpios' : 'Abiertos'}
             </button>
-            <button onClick={logout} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600" title="Cerrar Sesión / Reset">
-              <LogOut className="w-4 h-4" />
+
+            <button onClick={() => setHideComments(!hideComments)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${hideComments ? 'bg-pink-100 text-pink-700 border-pink-200 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Ocultar comentarios de Instagram">
+              <Instagram className="w-3 h-3 shrink-0" />
+              {hideComments ? 'Sin Com. IG' : 'Ver Com. IG'}
             </button>
-            <button onClick={() => loadConversations(true)} className="p-2 rounded-lg text-slate-500 hover:bg-white hover:text-[#00968f]" title="Actualizar">
-              <RefreshCw className="w-4 h-4" />
+
+            <button onClick={() => setHideGhosts(!hideGhosts)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${hideGhosts ? 'bg-red-100 text-red-700 border-red-200 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Ocultar contactos sin teléfono ni email">
+              <Ghost className="w-3 h-3 shrink-0" />
+              {hideGhosts ? 'Con Datos' : 'Todos'}
             </button>
           </div>
         </div>
@@ -562,6 +580,12 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                   if (est.includes('descartado') || est.includes('perdido') || est.includes('inscripto')) return false;
                 }
                 if (filterOrigen !== 'Todos' && c.origen !== filterOrigen) {
+                  return false;
+                }
+                if (hideComments && c.origen === 'Instagram - Comentario') {
+                  return false;
+                }
+                if (hideGhosts && !c.telefono && !c.email) {
                   return false;
                 }
                 return true;
