@@ -180,7 +180,8 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
     "RECURSOS HUMANOS",
     "PROMEDIO GENERAL DE PRÁCTICAS"
   ],
-  "ACTUALIZACION": []
+  "ACTUALIZACION": [],
+  "SELECCIONES_NACIONALES": []
 };
 
 export const getSubjectsByLicencia = (licencia: string): string[] => {
@@ -205,6 +206,7 @@ export const getSubjectsByLicencia = (licencia: string): string[] => {
   if (isTrayectoria1) return LICENCIA_SUBJECTS['TD1'];
   if (isTrayectoria2) return LICENCIA_SUBJECTS['PRO'];
   if (lic.includes('ACTUALIZACION')) return LICENCIA_SUBJECTS['ACTUALIZACION'];
+  if (lic.includes('SELECCIONES_NACIONALES')) return LICENCIA_SUBJECTS['SELECCIONES_NACIONALES'];
   if (lic === 'A' || lic.endsWith(' A') || lic.includes(' A ')) return LICENCIA_SUBJECTS['A'];
   if (lic === 'B' || lic.endsWith(' B') || lic.includes(' B ')) return LICENCIA_SUBJECTS['B'];
   if (lic === 'C' || lic.endsWith(' C') || lic.includes(' C ')) return LICENCIA_SUBJECTS['C'];

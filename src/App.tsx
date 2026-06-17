@@ -184,7 +184,7 @@ function AppContent() {
 
   // Alta manual de alumno
   const [newStudentModal, setNewStudentModal] = useState(false);
-  const [newStuLicencia, setNewStuLicencia] = useState<'CB' | 'A' | 'PRO' | 'TD1' | 'TD2' | 'ACTUALIZACION'>('CB');
+  const [newStuLicencia, setNewStuLicencia] = useState<'CB' | 'A' | 'PRO' | 'TD1' | 'TD2' | 'ACTUALIZACION' | 'SELECCIONES_NACIONALES'>('CB');
   const [newStuNombre, setNewStuNombre] = useState('');
   const [newStuApellido, setNewStuApellido] = useState('');
   const [newStuDni, setNewStuDni] = useState('');
@@ -218,7 +218,7 @@ function AppContent() {
 
   const getAnaliticoErrors = (student: StudentData | null): string[] => {
     if (!student) return ['No hay datos del alumno'];
-    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION') return [];
+    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION' || (student.licencia || '').toUpperCase() === 'SELECCIONES_NACIONALES') return [];
     
     const required = getSubjectsByLicencia(student.licencia || '');
     if (required.length === 0) return ['No se reconoce el plan de estudios para esta licencia.'];
@@ -252,7 +252,7 @@ function AppContent() {
       };
     }
 
-    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION') {
+    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION' || (student.licencia || '').toUpperCase() === 'SELECCIONES_NACIONALES') {
       return {
         faltantes: [] as string[],
         desaprobadas: [] as string[],
@@ -622,7 +622,7 @@ function AppContent() {
         nacionalidad: newStuNacionalidad,
         licencia: newStuLicencia,
         fecha_emision: newStuFechaEmision,
-        fecha_fin_cursada: newStuLicencia === 'ACTUALIZACION' ? undefined : newStuFechaFin
+        fecha_fin_cursada: (newStuLicencia === 'ACTUALIZACION' || newStuLicencia === 'SELECCIONES_NACIONALES') ? undefined : newStuFechaFin
       };
       const res = await fetch(`${API_URL}/api/students?${getUserQuery()}`, {
         method: 'POST',
@@ -824,7 +824,7 @@ function AppContent() {
     e.preventDefault();
     if (!diplomaModal.student) return;
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes emitir diplomas.'); return; }
-    const isAct = (diplomaModal.student.licencia || '').toUpperCase() === 'ACTUALIZACION';
+    const isAct = (diplomaModal.student.licencia || '').toUpperCase() === 'ACTUALIZACION' || (diplomaModal.student.licencia || '').toUpperCase() === 'SELECCIONES_NACIONALES';
     if (!isAct && !isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
 
     const formData = new FormData(e.currentTarget);
@@ -3589,6 +3589,7 @@ function AppContent() {
                     <option value="TD1">TD1</option>
                     <option value="TD2">TD2</option>
                     <option value="ACTUALIZACION">Curso de Actualización</option>
+                    <option value="SELECCIONES_NACIONALES">Selecciones Nacionales</option>
                   </select>
                 </div>
                 <div>
@@ -3596,7 +3597,7 @@ function AppContent() {
                   <input type="date" value={newStuFechaEmision} onChange={e => setNewStuFechaEmision(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm" />
                 </div>
               </div>
-              {newStuLicencia !== 'ACTUALIZACION' && (
+              {newStuLicencia !== 'ACTUALIZACION' && newStuLicencia !== 'SELECCIONES_NACIONALES' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha de Graduación / Fin de cursada</label>
@@ -3607,7 +3608,7 @@ function AppContent() {
                   </div>
                 </div>
               )}
-              {newStuLicencia === 'ACTUALIZACION' && (
+              {(newStuLicencia === 'ACTUALIZACION' || newStuLicencia === 'SELECCIONES_NACIONALES') && (
                 <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                   Solo se piden los datos que requiere el certificado del Curso de Actualización.
                 </p>
