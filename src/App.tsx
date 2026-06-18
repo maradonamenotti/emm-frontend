@@ -3475,6 +3475,8 @@ function AppContent() {
                   <option value="PRO">Licencia PRO</option>
                   <option value="TD1">TD1 (Trayectoria I)</option>
                   <option value="TD2">TD2 (Trayectoria II)</option>
+                  <option value="ACTUALIZACION">Curso de Actualización</option>
+                  <option value="SELECCIONES_NACIONALES">Selecciones Nacionales</option>
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
