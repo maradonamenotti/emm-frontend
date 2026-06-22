@@ -185,8 +185,11 @@ export const LICENCIA_SUBJECTS: Record<string, string[]> = {
 };
 
 export const getSubjectsByLicencia = (licencia: string): string[] => {
-  const lic = (licencia || '').toUpperCase().trim();
+  let lic = (licencia || '').toUpperCase().trim();
   if (!lic) return [];
+
+  if (lic.includes('SELECCIONES')) lic = 'SELECCIONES_NACIONALES';
+  if (lic.includes('ACTUALIZACION')) lic = 'ACTUALIZACION';
 
   const isTrayectoria1 = lic === 'BA'
     || lic === 'B Y A'

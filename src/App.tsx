@@ -216,9 +216,14 @@ function AppContent() {
   const [newMateria, setNewMateria] = useState('');
   const [newNota, setNewNota] = useState('');
 
+  const isDiplomaOnly = (licName?: string | null): boolean => {
+    const l = (licName || '').toUpperCase().trim();
+    return l.includes('ACTUALIZACION') || l.includes('SELECCIONES');
+  };
+
   const getAnaliticoErrors = (student: StudentData | null): string[] => {
     if (!student) return ['No hay datos del alumno'];
-    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION' || (student.licencia || '').toUpperCase() === 'SELECCIONES_NACIONALES') return [];
+    if (isDiplomaOnly(student.licencia)) return [];
     
     const required = getSubjectsByLicencia(student.licencia || '');
     if (required.length === 0) return ['No se reconoce el plan de estudios para esta licencia.'];
@@ -252,7 +257,7 @@ function AppContent() {
       };
     }
 
-    if ((student.licencia || '').toUpperCase() === 'ACTUALIZACION' || (student.licencia || '').toUpperCase() === 'SELECCIONES_NACIONALES') {
+    if (isDiplomaOnly(student.licencia)) {
       return {
         faltantes: [] as string[],
         desaprobadas: [] as string[],
@@ -824,7 +829,7 @@ function AppContent() {
     e.preventDefault();
     if (!diplomaModal.student) return;
     if (user?.role === 'viewer') { toast.error('Solo lectura: no puedes emitir diplomas.'); return; }
-    const isAct = (diplomaModal.student.licencia || '').toUpperCase() === 'ACTUALIZACION' || (diplomaModal.student.licencia || '').toUpperCase() === 'SELECCIONES_NACIONALES';
+    const isAct = isDiplomaOnly(diplomaModal.student.licencia);
     if (!isAct && !isAnaliticoCompleto(diplomaModal.student)) { toast.error('Analítico incompleto: faltan notas obligatorias.'); return; }
 
     const formData = new FormData(e.currentTarget);
@@ -2579,6 +2584,28 @@ function AppContent() {
                     (selectedStudent.notas || []).map(n => [stripAccents(n.materia), n.nota])
                   );
 
+                  if (isDiplomaOnly(selectedStudent.licencia)) {
+                    return (
+                      <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl text-center">
+                        <p className="text-emerald-800 font-bold mb-1">Curso de Solo Diploma</p>
+                        <p className="text-emerald-700/90 text-sm mb-3">Este curso no requiere la carga ni aprobación de materias analíticas.</p>
+                        {selectedStudent.notas && selectedStudent.notas.length > 0 && (
+                          <div className="mt-4 text-left">
+                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Materias cargadas (informativo):</p>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto border border-slate-100 rounded-lg p-2 bg-white">
+                              {selectedStudent.notas.map((n, idx) => (
+                                <div key={idx} className="flex justify-between text-xs text-slate-600 font-medium">
+                                  <span>{n.materia}</span>
+                                  <span className="font-bold text-slate-700">{n.nota}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   return planMaterias.length > 0 ? (
                     <div className="space-y-1 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                       {planMaterias.map((materia, i) => {
@@ -2817,16 +2844,20 @@ function AppContent() {
                         else if (type === 'diploma') openDiplomaModal(selectedStudent);
                       };
 
+                      const isDiplomaCourse = isDiplomaOnly(selectedStudent.licencia);
+
                       return (
                         <>
-                          <button
-                            onClick={() => !disabled && handleDownloadClick('preview')}
-                            disabled={disabled}
-                            className={`action-badge px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all border ${opacityClasses} ${!isComplete ? 'grayscale-[0.5]' : ''}`}
-                            title={isComplete ? "Vista previa del PDF" : "Faltan notas o hay notas menores a 6"}
-                          >
-                            <Download className="w-4 h-4" /> Vista Previa
-                          </button>
+                          {!isDiplomaCourse && (
+                            <button
+                              onClick={() => !disabled && handleDownloadClick('preview')}
+                              disabled={disabled}
+                              className={`action-badge px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center transition-all border ${opacityClasses} ${!isComplete ? 'grayscale-[0.5]' : ''}`}
+                              title={isComplete ? "Vista previa del PDF" : "Faltan notas o hay notas menores a 6"}
+                            >
+                              <Download className="w-4 h-4" /> Vista Previa
+                            </button>
+                          )}
                           <button
                             onClick={() => !disabled && handleDownloadClick('diploma')}
                             disabled={disabled}
@@ -2835,15 +2866,17 @@ function AppContent() {
                             <School className="w-5 h-5" />
                             Generar Diploma
                           </button>
-                          <button
-                            onClick={() => !disabled && handleDownloadClick('emit')}
-                            disabled={disabled}
-                            className={`flex items-center justify-center gap-2 px-4 py-2 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-lg text-sm font-bold transition-all shadow-md shadow-[#002d2b]/20${opacityClasses} ${!isLegajoReady ? 'grayscale-[0.5]' : ''}`}
-                            title="Genera el PDF y marca el analítico como Emitido"
-                          >
-                            <Download className="w-5 h-5" />
-                            Generar Analítico PDF
-                          </button>
+                          {!isDiplomaCourse && (
+                            <button
+                              onClick={() => !disabled && handleDownloadClick('emit')}
+                              disabled={disabled}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-lg text-sm font-bold transition-all shadow-md shadow-[#002d2b]/20${opacityClasses} ${!isLegajoReady ? 'grayscale-[0.5]' : ''}`}
+                              title="Genera el PDF y marca el analítico como Emitido"
+                            >
+                              <Download className="w-5 h-5" />
+                              Generar Analítico PDF
+                            </button>
+                          )}
                         </>
                       );
                     })()}
