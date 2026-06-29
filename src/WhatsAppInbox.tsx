@@ -196,6 +196,11 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
         const statusRes = await fetch(`${apiUrl}/api/whatsapp/status`);
         const statusData = await statusRes.json();
         setIsReady(statusData.isReady);
+        if (!statusData.isReady && statusData.qr) {
+          setQrCode(statusData.qr);
+        } else if (statusData.isReady) {
+          setQrCode(null);
+        }
       }
 
       const offset = reset ? 0 : conversations.length;
