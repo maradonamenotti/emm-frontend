@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Plantilla } from './CrmModule';
 
@@ -142,6 +142,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   const [hideComments, setHideComments] = useState(true);
   const [hideGhosts, setHideGhosts] = useState(false);
   const [filterOrigen, setFilterOrigen] = useState('Todos');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -566,6 +567,11 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
               <Ghost className="w-3 h-3 shrink-0" />
               {hideGhosts ? 'Con Datos' : 'Todos'}
             </button>
+
+            <button onClick={() => setShowUnreadOnly(!showUnreadOnly)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${showUnreadOnly ? 'bg-amber-100 text-amber-700 border-amber-200 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Mostrar solo chats con mensajes no leídos">
+              <Bell className="w-3 h-3 shrink-0" />
+              {showUnreadOnly ? 'No Leídos' : 'Todos'}
+            </button>
           </div>
         </div>
 
@@ -587,10 +593,13 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                 if (filterOrigen !== 'Todos' && c.origen !== filterOrigen) {
                   return false;
                 }
-                if (hideComments && c.origen === 'Instagram - Comentario') {
+                if (hideComments && c.origen === 'Instagram - Comentario' && filterOrigen !== 'Instagram - Comentario') {
                   return false;
                 }
                 if (hideGhosts && !c.telefono && !c.email) {
+                  return false;
+                }
+                if (showUnreadOnly && !c.no_leidos && c.id !== selectedId) {
                   return false;
                 }
                 return true;

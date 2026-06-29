@@ -4,7 +4,7 @@ import {
   ChevronDown, Settings, Download, Bell, Edit2, Trash2,
   Check, MessageCircle, Calendar, Search, Filter, RefreshCw,
   TrendingUp, Target, UserCheck, Copy, CheckCheck,
-  Globe, GraduationCap, Info, Ghost, Instagram
+  Globe, GraduationCap, Info, Ghost, Instagram, Tag
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WhatsAppInbox from './WhatsAppInbox';
@@ -47,6 +47,8 @@ export interface Prospecto {
   fue_alumno: boolean; fecha_ingreso: string; notas_generales?: string;
   historial?: HistorialEntry[];
   silenciar_automatizaciones?: boolean;
+  etiquetas?: string[];
+  motivo_perdida?: string;
 }
 interface Stats {
   total: number; inscriptos: number; descartados: number; activos: number;
@@ -346,7 +348,7 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
 
   const filtered = prospectos.filter(p => {
     if (hideGhosts && !p.telefono && !p.email) return false;
-    if (hideComments && p.origen === 'Instagram - Comentario') return false;
+    if (hideComments && p.origen === 'Instagram - Comentario' && filterOrigen !== 'Instagram - Comentario') return false;
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
@@ -1431,13 +1433,14 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
   onMerge?: (sourceId: string, targetId: string) => Promise<void>;
 }) {
   const [editMode, setEditMode] = useState(false);
-  const [form, setForm] = useState({ ...prospecto });
+  const [form, setForm] = useState({ ...prospecto, etiquetas: prospecto.etiquetas || [] });
   const [showSeg, setShowSeg] = useState(false);
   const [showPlantillas, setShowPlantillas] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [segForm, setSegForm] = useState({ tipo_contacto: 'WhatsApp', nota: '', fecha_proximo_aviso: '' });
+  const [tagDraft, setTagDraft] = useState('');
 
-  useEffect(() => { setForm({ ...prospecto }); }, [prospecto]);
+  useEffect(() => { setForm({ ...prospecto, etiquetas: prospecto.etiquetas || [] }); }, [prospecto]);
 
   const estados = config.estados; const origenes = config.origenes;
   const cursos = config.cursos; const operadoras = config.operadoras;
@@ -1448,14 +1451,26 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
   const plantillasSugeridas = plantillasDisponibles.filter(p => p.estado_sugerido === prospecto.estado);
   const otrasPlantillas = plantillasDisponibles.filter(p => p.estado_sugerido !== prospecto.estado);
 
+  const addTag = () => {
+    if (!tagDraft.trim()) return;
+    const currentTags = form.etiquetas || [];
+    if (currentTags.some((t: string) => t.toLowerCase() === tagDraft.trim().toLowerCase())) return;
+    setForm(f => ({ ...f, etiquetas: [...currentTags, tagDraft.trim()] }));
+    setTagDraft('');
+  };
+
+  const removeTag = (tag: string) => {
+    setForm((f: any) => ({ ...f, etiquetas: (f.etiquetas || []).filter((t: string) => t.toLowerCase() !== tag.toLowerCase()) }));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-full max-w-lg bg-white shadow-2xl flex flex-col h-full overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white shrink-0">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-extrabold text-slate-900 truncate">{prospecto.nombre} {prospecto.apellido}</h3>
               {prospecto.fue_alumno && <span className="flex items-center gap-1 text-[10px] font-black text-[#00968f] bg-[#0ffff4]/20 border border-[#0ffff4]/40 rounded-full px-2 py-0.5 shrink-0"><GraduationCap className="w-3 h-3" />Ex alumno</span>}
               {prospecto.silenciar_automatizaciones && <span className="flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0"><Bell className="w-3 h-3" />Auto silenciado</span>}
@@ -1468,254 +1483,332 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl ml-3 shrink-0"><X className="w-5 h-5" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* DATOS */}
-          <div className="p-6 border-b border-slate-100">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-bold text-slate-700">Datos del Prospecto</h4>
-              {canEdit && (
-                <div className="flex gap-2">
-                  {!editMode && (
-                    <button onClick={() => setShowMergeModal(true)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all bg-amber-50 hover:bg-amber-100 text-amber-700">
-                      <Users className="w-3.5 h-3.5" /> Fusionar
-                    </button>
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Columna Izquierda: Datos del Prospecto y Plantillas */}
+            <div className="space-y-6">
+              
+              {/* DATOS DEL PROSPECTO */}
+              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-slate-700">Datos del Prospecto</h4>
+                  {canEdit && (
+                    <div className="flex gap-2">
+                      {!editMode && (
+                        <button onClick={() => setShowMergeModal(true)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all bg-amber-50 hover:bg-amber-100 text-amber-700">
+                          <Users className="w-3.5 h-3.5" /> Fusionar
+                        </button>
+                      )}
+                      <button onClick={() => { if (editMode) { onSave(prospecto.id, form); setEditMode(false); } else setEditMode(true); }}
+                        className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all ${editMode ? 'bg-[#002d2b] text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+                        {editMode ? <><Check className="w-3.5 h-3.5" /> Guardar</> : <><Edit2 className="w-3.5 h-3.5" /> Editar</>}
+                      </button>
+                    </div>
                   )}
-                  <button onClick={() => { if (editMode) { onSave(prospecto.id, form); setEditMode(false); } else setEditMode(true); }}
-                    className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all ${editMode ? 'bg-[#002d2b] text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
-                    {editMode ? <><Check className="w-3.5 h-3.5" /> Guardar</> : <><Edit2 className="w-3.5 h-3.5" /> Editar</>}
-                  </button>
                 </div>
-              )}
+
+                {editMode ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {[['nombre', 'Nombre'], ['apellido', 'Apellido']].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="text-xs font-bold text-slate-500 block mb-1">{label}</label>
+                          <input value={(form as any)[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[['telefono', 'Teléfono'], ['email', 'Email']].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="text-xs font-bold text-slate-500 block mb-1">{label}</label>
+                          <input value={(form as any)[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">País</label>
+                      <input value={form.pais || ''} onChange={e => setForm(f => ({ ...f, pais: e.target.value }))} placeholder="Ej: Argentina, México, España..." className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+                    </div>
+                    
+                    {/* Etiquetas en Edición */}
+                    <div className="border-t border-slate-100 pt-3 mt-2">
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Etiquetas</label>
+                      <div className="flex gap-2">
+                        <input
+                          value={tagDraft}
+                          onChange={e => setTagDraft(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addTag();
+                            }
+                          }}
+                          placeholder="Ej: Ana, Urgente, Beca..."
+                          className="min-w-0 flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={addTag}
+                          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-[#00968f] text-white text-xs font-bold transition-all shrink-0"
+                        >
+                          Agregar
+                        </button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(form.etiquetas || []).map((tag: string) => (
+                          <span key={tag} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-xs font-bold text-emerald-700">
+                            <Tag className="w-3 h-3 text-emerald-600" />
+                            {tag}
+                            <button type="button" onClick={() => removeTag(tag)} className="text-emerald-500 hover:text-red-500 transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                      <input type="checkbox" checked={!!form.fue_alumno} onChange={e => setForm(f => ({ ...f, fue_alumno: e.target.checked }))} className="w-4 h-4 accent-[#00968f] rounded" />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><GraduationCap className="w-4 h-4 text-[#00968f]" /> Fue alumno de la Escuela</p>
+                        <p className="text-xs text-slate-400">Marcar si esta persona ya cursó anteriormente</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                      <input type="checkbox" checked={!!form.silenciar_automatizaciones} onChange={e => setForm(f => ({ ...f, silenciar_automatizaciones: e.target.checked }))} className="w-4 h-4 accent-amber-500 rounded" />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><Bell className="w-4 h-4 text-amber-500" /> Silenciar automatizaciones</p>
+                        <p className="text-xs text-slate-400">Desactivar mensajes automáticos de seguimiento para este prospecto</p>
+                      </div>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Curso de Interés</label>
+                        <select value={form.curso_interes || ''} onChange={e => setForm(f => ({ ...f, curso_interes: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+                          <option value="">Sin especificar</option>
+                          {cursos.map(c => <option key={c.id} value={c.valor}>{c.valor}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Origen</label>
+                        <select value={form.origen} onChange={e => setForm(f => ({ ...f, origen: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+                          {origenes.map(o => <option key={o.id} value={o.valor}>{o.valor}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Asignado a</label>
+                        <select value={form.asignado_a || ''} onChange={e => setForm(f => ({ ...f, asignado_a: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+                          <option value="">Sin asignar</option>
+                          {operadoras.map(o => <option key={o.id} value={o.valor}>{o.valor}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Estado</label>
+                        <select value={form.estado} onChange={e => { setForm(f => ({ ...f, estado: e.target.value })); onEstadoChange(prospecto.id, e.target.value); }}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+                          {estados.map(s => <option key={s.id} value={s.valor}>{s.valor}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Notas generales</label>
+                      <textarea value={form.notas_generales || ''} onChange={e => setForm(f => ({ ...f, notas_generales: e.target.value }))} rows={3} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-none focus:ring-2 focus:ring-[#00968f] outline-none" />
+                    </div>
+                    <button onClick={() => setEditMode(false)} className="text-sm text-slate-500 hover:text-slate-700 mt-2 block">Cancelar</button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        ['Teléfono', prospecto.telefono, 'phone'],
+                        ['Email', prospecto.email, 'email'],
+                        ['País', prospecto.pais, 'text'],
+                        ['Curso', prospecto.curso_interes, 'text'],
+                        ['Origen', prospecto.origen, 'text'],
+                        ['Asignado', prospecto.asignado_a, 'text'],
+                        ['Ingresó', new Date(prospecto.fecha_ingreso).toLocaleDateString('es-AR'), 'text'],
+                      ].map(([label, value, type]) => (
+                        <div key={label as string} className="min-w-0">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label as string}</p>
+                          {type === 'phone' && value ? (
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="font-semibold text-slate-800 text-sm truncate">{value as string}</span>
+                              <button
+                                onClick={() => onOpenInWA?.(prospecto.id)}
+                                title="Abrir en Bandeja WA"
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-[11px] font-bold hover:bg-green-100 transition-colors shrink-0"
+                              >
+                                <MessageCircle className="w-3 h-3" />Bandeja WA
+                              </button>
+                            </div>
+                          ) : type === 'email' && value ? (
+                            <a href={`mailto:${value}`} className="text-blue-600 font-semibold text-sm hover:underline block truncate mt-0.5">{value as string}</a>
+                          ) : (
+                            <p className="font-semibold text-slate-800 text-sm truncate mt-0.5">{(value as string) || '—'}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Etiquetas en modo Lectura */}
+                    <div className="border-t border-slate-100 pt-3 mt-2">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <Tag className="w-3 h-3 text-slate-400" /> Etiquetas
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(!prospecto.etiquetas || prospecto.etiquetas.length === 0) ? (
+                          <span className="text-xs text-slate-400 italic">Sin etiquetas</span>
+                        ) : (
+                          prospecto.etiquetas.map((tag: string) => (
+                            <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-xs font-bold text-emerald-700">
+                              {tag}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {prospecto.motivo_perdida && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-3.5 text-red-700 text-xs flex gap-2 items-start mt-2">
+                        <Info className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                        <div>
+                          <span className="font-bold">Lead Descartado:</span> {prospecto.motivo_perdida}
+                        </div>
+                      </div>
+                    )}
+
+                    {prospecto.notas_generales && (
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notas</p>
+                        <p className="font-medium text-slate-700 text-sm whitespace-pre-wrap">{prospecto.notas_generales}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* PLANTILLAS SUGERIDAS */}
+              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5">
+                <button onClick={() => setShowPlantillas(s => !s)} className="w-full flex items-center justify-between">
+                  <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4 text-green-600" />
+                    Plantillas WA
+                    {plantillasSugeridas.length > 0 && <span className="text-xs bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full">{plantillasSugeridas.length} sugeridas</span>}
+                  </h4>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showPlantillas ? 'rotate-180' : ''}`} />
+                </button>
+                {showPlantillas && (
+                  <div className="mt-4 space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                    {plantillasSugeridas.length > 0 && (
+                      <>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">💡 Sugeridas para estado "{prospecto.estado}"</p>
+                        {plantillasSugeridas.map(p => (
+                          <div key={p.id} className="bg-green-50 border border-green-100 rounded-xl p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-slate-700">{p.titulo}</p>
+                                <p className="text-[10px] text-slate-500">{p.curso || 'General'} · {p.categoria}</p>
+                              </div>
+                              <CopyButton text={renderPlantillaText(p.texto, prospecto, p.curso)} />
+                            </div>
+                            <pre className="text-xs text-slate-600 whitespace-pre-wrap font-sans leading-relaxed line-clamp-4">{renderPlantillaText(p.texto, prospecto, p.curso)}</pre>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {otrasPlantillas.length > 0 && (
+                      <>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-4">Otras plantillas</p>
+                        {otrasPlantillas.map(p => (
+                          <div key={p.id} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-slate-700">{p.titulo}</p>
+                                <p className="text-[10px] text-slate-400">{p.curso || 'General'} · {p.categoria} · Estado: {p.estado_sugerido || 'Cualquiera'}</p>
+                              </div>
+                              <CopyButton text={renderPlantillaText(p.texto, prospecto, p.curso)} />
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {editMode ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  {[['nombre', 'Nombre'], ['apellido', 'Apellido']].map(([field, label]) => (
-                    <div key={field}>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">{label}</label>
-                      <input value={(form as any)[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+            {/* Columna Derecha: Historial de Seguimientos */}
+            <div className="space-y-6 md:border-l md:border-slate-100 md:pl-6 flex flex-col min-h-0">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-[#00968f]" /> Historial de Seguimientos
+                  </h4>
+                  {canEdit && (
+                    <button onClick={() => setShowSeg(s => !s)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-[#002d2b] text-white font-semibold hover:bg-[#00968f] transition-all">
+                      <Plus className="w-3.5 h-3.5" /> Agregar
+                    </button>
+                  )}
+                </div>
+
+                {showSeg && canEdit && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Tipo de contacto</label>
+                      <select value={segForm.tipo_contacto} onChange={e => setSegForm(s => ({ ...s, tipo_contacto: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white">
+                        {TIPOS_CONTACTO.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                     </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[['telefono', 'Teléfono'], ['email', 'Email']].map(([field, label]) => (
-                    <div key={field}>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">{label}</label>
-                      <input value={(form as any)[field] || ''} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Nota / Detalle</label>
+                      <textarea value={segForm.nota} onChange={e => setSegForm(s => ({ ...s, nota: e.target.value }))} rows={3} placeholder="Ej: Me pidió que le escriba el mes que viene..." className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-none" />
                     </div>
-                  ))}
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">País</label>
-                  <input value={form.pais || ''} onChange={e => setForm(f => ({ ...f, pais: e.target.value }))} placeholder="Ej: Argentina, México, España..." className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
-                </div>
-                <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={!!form.fue_alumno} onChange={e => setForm(f => ({ ...f, fue_alumno: e.target.checked }))} className="w-4 h-4 accent-[#00968f] rounded" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><GraduationCap className="w-4 h-4 text-[#00968f]" /> Fue alumno de la Escuela</p>
-                    <p className="text-xs text-slate-400">Marcar si esta persona ya cursó anteriormente</p>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Fecha próximo aviso</label>
+                      <input type="date" value={segForm.fecha_proximo_aviso} onChange={e => setSegForm(s => ({ ...s, fecha_proximo_aviso: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => { onAddSeguimiento(prospecto.id, segForm); setSegForm({ tipo_contacto: 'WhatsApp', nota: '', fecha_proximo_aviso: '' }); setShowSeg(false); }}
+                        className="flex-1 py-2 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl text-sm font-bold">Guardar</button>
+                      <button onClick={() => setShowSeg(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-semibold">Cancelar</button>
+                    </div>
                   </div>
-                </label>
-                <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={!!form.silenciar_automatizaciones} onChange={e => setForm(f => ({ ...f, silenciar_automatizaciones: e.target.checked }))} className="w-4 h-4 accent-amber-500 rounded" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><Bell className="w-4 h-4 text-amber-500" /> Silenciar automatizaciones</p>
-                    <p className="text-xs text-slate-400">Desactivar mensajes automáticos de seguimiento para este prospecto</p>
-                  </div>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 block mb-1">Curso de Interés</label>
-                    <select value={form.curso_interes || ''} onChange={e => setForm(f => ({ ...f, curso_interes: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
-                      <option value="">Sin especificar</option>
-                      {cursos.map(c => <option key={c.id} value={c.valor}>{c.valor}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 block mb-1">Origen</label>
-                    <select value={form.origen} onChange={e => setForm(f => ({ ...f, origen: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
-                      {origenes.map(o => <option key={o.id} value={o.valor}>{o.valor}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 block mb-1">Asignado a</label>
-                    <select value={form.asignado_a || ''} onChange={e => setForm(f => ({ ...f, asignado_a: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
-                      <option value="">Sin asignar</option>
-                      {operadoras.map(o => <option key={o.id} value={o.valor}>{o.valor}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 block mb-1">Estado</label>
-                    <select value={form.estado} onChange={e => { setForm(f => ({ ...f, estado: e.target.value })); onEstadoChange(prospecto.id, e.target.value); }}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
-                      {estados.map(s => <option key={s.id} value={s.valor}>{s.valor}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Notas generales</label>
-                  <textarea value={form.notas_generales || ''} onChange={e => setForm(f => ({ ...f, notas_generales: e.target.value }))} rows={3} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-none focus:ring-2 focus:ring-[#00968f] outline-none" />
-                </div>
-                <button onClick={() => setEditMode(false)} className="text-sm text-slate-500 hover:text-slate-700">Cancelar</button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    ['Teléfono', prospecto.telefono, 'phone'],
-                    ['Email', prospecto.email, 'email'],
-                    ['País', prospecto.pais, 'text'],
-                    ['Curso', prospecto.curso_interes, 'text'],
-                    ['Origen', prospecto.origen, 'text'],
-                    ['Asignado', prospecto.asignado_a, 'text'],
-                    ['Ingresó', new Date(prospecto.fecha_ingreso).toLocaleDateString('es-AR'), 'text'],
-                  ].map(([label, value, type]) => (
-                    <div key={label as string}>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label as string}</p>
-                      {type === 'phone' && value ? (
+                )}
+
+                <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-1 custom-scrollbar">
+                  {(prospecto.historial || []).map(h => (
+                    <div key={h.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-800 text-sm">{value as string}</span>
-                          <button
-                            onClick={() => onOpenInWA?.(prospecto.id)}
-                            title="Abrir en Bandeja WA"
-                            className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-[11px] font-bold hover:bg-green-100 transition-colors"
-                          >
-                            <MessageCircle className="w-3 h-3" />Bandeja WA
-                          </button>
+                          <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{h.tipo_contacto}</span>
+                          <span className="text-xs text-slate-400">{new Date(h.fecha_contacto).toLocaleDateString('es-AR')}</span>
                         </div>
-                      ) : type === 'email' && value ? (
-                        <a href={`mailto:${value}`} className="text-blue-600 font-semibold text-sm hover:underline">{value as string}</a>
-                      ) : (
-                        <p className="font-semibold text-slate-800 text-sm">{(value as string) || '—'}</p>
+                        {canEdit && (
+                          <button onClick={() => onDeleteSeguimiento(prospecto.id, h.id)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {h.nota && <p className="text-sm text-slate-700 mt-2">{h.nota}</p>}
+                      {h.fecha_proximo_aviso && (
+                        <p className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
+                          <Bell className="w-3 h-3" /> Próximo aviso: {new Date(h.fecha_proximo_aviso + 'T00:00:00').toLocaleDateString('es-AR')}
+                        </p>
                       )}
                     </div>
                   ))}
-                </div>
-                {prospecto.notas_generales && (
-                  <div className="col-span-2 bg-slate-50 rounded-xl p-3">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notas</p>
-                    <p className="font-medium text-slate-700 text-sm">{prospecto.notas_generales}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* PLANTILLAS SUGERIDAS (en drawer) */}
-          <div className="p-6 border-b border-slate-100">
-            <button onClick={() => setShowPlantillas(s => !s)} className="w-full flex items-center justify-between">
-              <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-green-600" />
-                Plantillas WA
-                {plantillasSugeridas.length > 0 && <span className="text-xs bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full">{plantillasSugeridas.length} sugeridas</span>}
-              </h4>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showPlantillas ? 'rotate-180' : ''}`} />
-            </button>
-            {showPlantillas && (
-              <div className="mt-4 space-y-3">
-                {plantillasSugeridas.length > 0 && (
-                  <>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">💡 Sugeridas para estado "{prospecto.estado}"</p>
-                    {plantillasSugeridas.map(p => (
-                      <div key={p.id} className="bg-green-50 border border-green-100 rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-bold text-slate-700">{p.titulo}</p>
-                            <p className="text-[10px] text-slate-500">{p.curso || 'General'} · {p.categoria}</p>
-                          </div>
-                          <CopyButton text={renderPlantillaText(p.texto, prospecto, p.curso)} />
-                        </div>
-                        <pre className="text-xs text-slate-600 whitespace-pre-wrap font-sans leading-relaxed line-clamp-4">{renderPlantillaText(p.texto, prospecto, p.curso)}</pre>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {otrasPlantillas.length > 0 && (
-                  <>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-4">Otras plantillas</p>
-                    {otrasPlantillas.map(p => (
-                      <div key={p.id} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-bold text-slate-700">{p.titulo}</p>
-                            <p className="text-[10px] text-slate-400">{p.curso || 'General'} · {p.categoria} · Estado: {p.estado_sugerido || 'Cualquiera'}</p>
-                          </div>
-                          <CopyButton text={renderPlantillaText(p.texto, prospecto, p.curso)} />
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* HISTORIAL */}
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#00968f]" /> Historial de Seguimientos
-              </h4>
-              {canEdit && (
-                <button onClick={() => setShowSeg(s => !s)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-[#002d2b] text-white font-semibold hover:bg-[#00968f] transition-all">
-                  <Plus className="w-3.5 h-3.5" /> Agregar
-                </button>
-              )}
-            </div>
-
-            {showSeg && canEdit && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Tipo de contacto</label>
-                  <select value={segForm.tipo_contacto} onChange={e => setSegForm(s => ({ ...s, tipo_contacto: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white">
-                    {TIPOS_CONTACTO.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Nota / Detalle</label>
-                  <textarea value={segForm.nota} onChange={e => setSegForm(s => ({ ...s, nota: e.target.value }))} rows={3} placeholder="Ej: Me pidió que le escriba el mes que viene..." className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-none" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">Fecha próximo aviso</label>
-                  <input type="date" value={segForm.fecha_proximo_aviso} onChange={e => setSegForm(s => ({ ...s, fecha_proximo_aviso: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => { onAddSeguimiento(prospecto.id, segForm); setSegForm({ tipo_contacto: 'WhatsApp', nota: '', fecha_proximo_aviso: '' }); setShowSeg(false); }}
-                    className="flex-1 py-2 bg-[#002d2b] hover:bg-[#00968f] text-white rounded-xl text-sm font-bold">Guardar</button>
-                  <button onClick={() => setShowSeg(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-semibold">Cancelar</button>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {(prospecto.historial || []).map(h => (
-                <div key={h.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{h.tipo_contacto}</span>
-                      <span className="text-xs text-slate-400">{new Date(h.fecha_contacto).toLocaleDateString('es-AR')}</span>
-                    </div>
-                    {canEdit && (
-                      <button onClick={() => onDeleteSeguimiento(prospecto.id, h.id)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  {h.nota && <p className="text-sm text-slate-700 mt-2">{h.nota}</p>}
-                  {h.fecha_proximo_aviso && (
-                    <p className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
-                      <Bell className="w-3 h-3" /> Próximo aviso: {new Date(h.fecha_proximo_aviso + 'T00:00:00').toLocaleDateString('es-AR')}
+                  {(!prospecto.historial || prospecto.historial.length === 0) && (
+                    <p className="text-center text-slate-400 text-sm py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      Sin seguimientos registrados
                     </p>
                   )}
                 </div>
-              ))}
-              {(!prospecto.historial || prospecto.historial.length === 0) && (
-                <p className="text-center text-slate-400 text-sm py-8">Sin seguimientos registrados</p>
-              )}
+              </div>
             </div>
+
           </div>
         </div>
       </div>
