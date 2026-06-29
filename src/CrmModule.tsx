@@ -29,6 +29,7 @@ interface CrmConfigItem {
   es_sistema?: boolean; descripcion?: string; accion_sugerida?: string;
   icono?: string; recordatorio_horas?: number; id_plantilla_recordatorio?: string;
   inactividad_dias_descarte?: number;
+  valor_estimado?: number;
 }
 interface CrmConfig {
   estados: CrmConfigItem[]; origenes: CrmConfigItem[];
@@ -45,10 +46,13 @@ export interface Prospecto {
   origen: string; estado: string; asignado_a?: string;
   fue_alumno: boolean; fecha_ingreso: string; notas_generales?: string;
   historial?: HistorialEntry[];
+  silenciar_automatizaciones?: boolean;
 }
 interface Stats {
   total: number; inscriptos: number; descartados: number; activos: number;
   tasaConversion: number;
+  ingresosGanados: number;
+  ingresosPerdidos: number;
   porEstado: { estado: string; color: string; es_ganado: boolean; es_perdido: boolean; count: number }[];
   porOrigen: { origen: string; color: string; count: number }[];
   motivosPerdida: { motivo: string; count: number }[];
@@ -411,7 +415,7 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pb-4">
-          {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={async (id) => { await openProspecto(id); onNavigate?.('lista'); }} />}
+          {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={async (id) => { await openProspecto(id); onNavigate?.('lista'); }} apiUrl={apiUrl} onRefresh={refreshAll} />}
           {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} />}
           {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} filterCurso={filterCurso} setFilterCurso={setFilterCurso} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} />}
           {subView === 'plantillas' && <PlantillasView plantillas={plantillas} config={config} canEdit={canEdit} apiUrl={apiUrl} onRefresh={fetchPlantillas} />}
@@ -454,6 +458,22 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
             await fetch(`${apiUrl}/api/crm/prospectos/${pid}/seguimiento/${sid}`, { method: 'DELETE' });
             const fresh = await fetch(`${apiUrl}/api/crm/prospectos/${pid}`);
             if (fresh.ok) setSelectedProspecto(await fresh.json());
+          }}
+          prospectos={prospectos}
+          onMerge={async (sourceId, targetId) => {
+            const r = await fetch(`${apiUrl}/api/crm/prospectos/${sourceId}/merge`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ targetId })
+            });
+            if (r.ok) {
+              toast.success('Leads fusionados correctamente');
+              setSelectedProspecto(null);
+              refreshAll();
+            } else {
+              const err = await r.json();
+              toast.error(err.message || 'Error al fusionar');
+            }
           }}
         />
       )}
@@ -632,8 +652,27 @@ function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: st
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD KPIs
 // ═══════════════════════════════════════════════════════════════════════════════
-function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null; config: CrmConfig; onOpenProspecto: (id: string) => void }) {
+function DashboardView({ stats, config, onOpenProspecto, apiUrl, onRefresh }: { stats: Stats | null; config: CrmConfig; onOpenProspecto: (id: string) => void; apiUrl?: string; onRefresh?: () => void }) {
   const [showEstados, setShowEstados] = useState(false);
+
+  const handleSnooze = async (id: string, dias: number) => {
+    try {
+      const r = await fetch(`${apiUrl}/api/crm/seguimiento/${id}/snooze`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dias })
+      });
+      if (r.ok) {
+        toast.success('Alerta pospuesta');
+        onRefresh?.();
+      } else {
+        toast.error('Error al posponer alerta');
+      }
+    } catch (e) {
+      toast.error('Error de red');
+    }
+  };
+
   if (!stats) return <div className="text-center text-slate-400 py-20">Cargando estadísticas...</div>;
 
   const maxEstado = Math.max(...stats.porEstado.map(e => e.count), 1);
@@ -642,20 +681,22 @@ function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
           { label: 'Total Leads', value: stats.total, icon: Users, color: 'var(--kpi-leads-color)', bg: 'var(--kpi-leads-bg)' },
           { label: 'Activos', value: stats.activos, icon: TrendingUp, color: 'var(--kpi-activos-color)', bg: 'var(--kpi-activos-bg)' },
           { label: 'Inscriptos', value: stats.inscriptos, icon: UserCheck, color: 'var(--kpi-inscriptos-color)', bg: 'var(--kpi-inscriptos-bg)' },
           { label: 'Tasa Conversión', value: `${stats.tasaConversion}%`, icon: Target, color: 'var(--kpi-tasa-color)', bg: 'var(--kpi-tasa-bg)' },
+          { label: 'Ingresos Ganados (Est.)', value: new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(stats.ingresosGanados || 0), icon: CheckCheck, color: '#00968f', bg: '#e0fcfb' },
+          { label: 'Ingresos Perdidos (Est.)', value: new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(stats.ingresosPerdidos || 0), icon: Trash2, color: '#EF4444', bg: '#FEE2E2' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
-            <div className="p-3 rounded-xl shrink-0" style={{ backgroundColor: bg }}>
-              <Icon className="w-6 h-6" style={{ color }} />
+          <div key={label} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl shrink-0" style={{ backgroundColor: bg }}>
+              <Icon className="w-5 h-5" style={{ color }} />
             </div>
-            <div>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{label}</p>
-              <p className="text-3xl font-extrabold" style={{ color }}>{value}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider truncate">{label}</p>
+              <p className="text-xl font-black truncate" style={{ color }}>{value}</p>
             </div>
           </div>
         ))}
@@ -798,6 +839,15 @@ function DashboardView({ stats, config, onOpenProspecto }: { stats: Stats | null
                   )}
                   <button onClick={() => onOpenProspecto(a.prospecto_id)} className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1.5 rounded-lg font-semibold transition-all">
                     Ver detalle
+                  </button>
+                  <button onClick={() => handleSnooze(a.id, 1)} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg font-semibold transition-all" title="Posponer 1 día (Mañana)">
+                    +1d
+                  </button>
+                  <button onClick={() => handleSnooze(a.id, 2)} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg font-semibold transition-all" title="Posponer 2 días">
+                    +2d
+                  </button>
+                  <button onClick={() => handleSnooze(a.id, 7)} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg font-semibold transition-all" title="Posponer 1 semana (7 días)">
+                    +7d
                   </button>
                 </div>
               </div>
@@ -1369,7 +1419,7 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
 // ═══════════════════════════════════════════════════════════════════════════════
 // DRAWER DETALLE
 // ═══════════════════════════════════════════════════════════════════════════════
-function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEstadoChange, onSave, onAddSeguimiento, onDeleteSeguimiento, onOpenInWA }: {
+function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEstadoChange, onSave, onAddSeguimiento, onDeleteSeguimiento, onOpenInWA, prospectos = [], onMerge }: {
   prospecto: Prospecto; plantillas: Plantilla[]; config: CrmConfig; canEdit: boolean; apiUrl: string;
   onClose: () => void;
   onEstadoChange: (id: string, estado: string) => void;
@@ -1377,11 +1427,14 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
   onAddSeguimiento: (id: string, data: any) => void;
   onDeleteSeguimiento: (pid: string, sid: string) => void;
   onOpenInWA?: (id: string) => void;
+  prospectos?: Prospecto[];
+  onMerge?: (sourceId: string, targetId: string) => Promise<void>;
 }) {
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ ...prospecto });
   const [showSeg, setShowSeg] = useState(false);
   const [showPlantillas, setShowPlantillas] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const [segForm, setSegForm] = useState({ tipo_contacto: 'WhatsApp', nota: '', fecha_proximo_aviso: '' });
 
   useEffect(() => { setForm({ ...prospecto }); }, [prospecto]);
@@ -1405,6 +1458,7 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-extrabold text-slate-900 truncate">{prospecto.nombre} {prospecto.apellido}</h3>
               {prospecto.fue_alumno && <span className="flex items-center gap-1 text-[10px] font-black text-[#00968f] bg-[#0ffff4]/20 border border-[#0ffff4]/40 rounded-full px-2 py-0.5 shrink-0"><GraduationCap className="w-3 h-3" />Ex alumno</span>}
+              {prospecto.silenciar_automatizaciones && <span className="flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0"><Bell className="w-3 h-3" />Auto silenciado</span>}
             </div>
             <div className="mt-1 flex items-center gap-2">
               <EstadoBadge estado={prospecto.estado} config={config} />
@@ -1420,10 +1474,17 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-bold text-slate-700">Datos del Prospecto</h4>
               {canEdit && (
-                <button onClick={() => { if (editMode) { onSave(prospecto.id, form); setEditMode(false); } else setEditMode(true); }}
-                  className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all ${editMode ? 'bg-[#002d2b] text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
-                  {editMode ? <><Check className="w-3.5 h-3.5" /> Guardar</> : <><Edit2 className="w-3.5 h-3.5" /> Editar</>}
-                </button>
+                <div className="flex gap-2">
+                  {!editMode && (
+                    <button onClick={() => setShowMergeModal(true)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all bg-amber-50 hover:bg-amber-100 text-amber-700">
+                      <Users className="w-3.5 h-3.5" /> Fusionar
+                    </button>
+                  )}
+                  <button onClick={() => { if (editMode) { onSave(prospecto.id, form); setEditMode(false); } else setEditMode(true); }}
+                    className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold transition-all ${editMode ? 'bg-[#002d2b] text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+                    {editMode ? <><Check className="w-3.5 h-3.5" /> Guardar</> : <><Edit2 className="w-3.5 h-3.5" /> Editar</>}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1449,12 +1510,18 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
                   <label className="text-xs font-bold text-slate-500 block mb-1">País</label>
                   <input value={form.pais || ''} onChange={e => setForm(f => ({ ...f, pais: e.target.value }))} placeholder="Ej: Argentina, México, España..." className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
                 </div>
-                {/* fue_alumno checkbox */}
                 <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
                   <input type="checkbox" checked={!!form.fue_alumno} onChange={e => setForm(f => ({ ...f, fue_alumno: e.target.checked }))} className="w-4 h-4 accent-[#00968f] rounded" />
                   <div>
                     <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><GraduationCap className="w-4 h-4 text-[#00968f]" /> Fue alumno de la Escuela</p>
                     <p className="text-xs text-slate-400">Marcar si esta persona ya cursó anteriormente</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                  <input type="checkbox" checked={!!form.silenciar_automatizaciones} onChange={e => setForm(f => ({ ...f, silenciar_automatizaciones: e.target.checked }))} className="w-4 h-4 accent-amber-500 rounded" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><Bell className="w-4 h-4 text-amber-500" /> Silenciar automatizaciones</p>
+                    <p className="text-xs text-slate-400">Desactivar mensajes automáticos de seguimiento para este prospecto</p>
                   </div>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -1652,6 +1719,105 @@ function DrawerDetalle({ prospecto, plantillas, config, canEdit, onClose, onEsta
           </div>
         </div>
       </div>
+      {showMergeModal && onMerge && (
+        <MergeLeadsModal 
+          source={prospecto} 
+          prospectos={prospectos} 
+          onClose={() => setShowMergeModal(false)} 
+          onMerge={async (targetId) => {
+            await onMerge(prospecto.id, targetId);
+            setShowMergeModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MergeLeadsModal({ source, prospectos, onClose, onMerge }: { source: Prospecto; prospectos: Prospecto[]; onClose: () => void; onMerge: (targetId: string) => Promise<void> }) {
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const filtered = prospectos.filter(p => {
+    if (p.id === source.id) return false;
+    const term = search.toLowerCase();
+    return (
+      p.nombre.toLowerCase().includes(term) ||
+      p.apellido.toLowerCase().includes(term) ||
+      (p.telefono || '').includes(term) ||
+      (p.email || '').toLowerCase().includes(term)
+    );
+  }).slice(0, 10);
+
+  const handleConfirm = async () => {
+    if (!selectedId) return;
+    const target = prospectos.find(p => p.id === selectedId);
+    if (!target) return;
+    if (!confirm(`¿Estás seguro de fusionar a ${source.nombre} ${source.apellido} dentro de ${target.nombre} ${target.apellido}?\n\n¡${source.nombre} será eliminado permanentemente!`)) return;
+    setSubmitting(true);
+    await onMerge(selectedId);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-amber-50/50">
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Users className="w-5 h-5 text-amber-600" /> Fusionar Leads</h3>
+          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+            ⚠️ <strong>Atención:</strong> Todos los chats, notas e historial de <strong>{source.nombre} {source.apellido}</strong> se moverán al lead seleccionado abajo. Luego, <strong>{source.nombre} {source.apellido}</strong> será eliminado.
+          </p>
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Buscar lead destino</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+              <input 
+                type="text" 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+                placeholder="Escribe nombre, teléfono o email..." 
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#00968f]"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-48 overflow-y-auto space-y-1 divide-y divide-slate-100 border border-slate-200 rounded-xl p-2 bg-slate-50">
+            {filtered.map(p => (
+              <button 
+                key={p.id} 
+                type="button"
+                onClick={() => setSelectedId(p.id)}
+                className={`w-full text-left p-2.5 rounded-lg text-xs flex justify-between items-center transition-all ${selectedId === p.id ? 'bg-[#002d2b] text-white' : 'hover:bg-white text-slate-700'}`}
+              >
+                <div>
+                  <p className="font-bold">{p.nombre} {p.apellido}</p>
+                  <p className={`${selectedId === p.id ? 'text-slate-300' : 'text-slate-400'} mt-0.5`}>{p.telefono || 'Sin tel'} · {p.email || 'Sin email'} · {p.estado}</p>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black ${selectedId === p.id ? 'bg-[#00968f] text-white border-[#00ffff]' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{p.origen}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-center text-slate-400 text-xs py-8">Escribe para buscar prospectos...</p>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm">Cancelar</button>
+            <button 
+              type="button" 
+              onClick={handleConfirm} 
+              disabled={!selectedId || submitting}
+              className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md"
+            >
+              {submitting ? 'Fusionando...' : 'Fusionar Ahora'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1776,6 +1942,7 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
   const [newRecHoras, setNewRecHoras] = useState<number>(0);
   const [newRecPlantilla, setNewRecPlantilla] = useState('');
   const [newDescDias, setNewDescDias] = useState<number>(0);
+  const [newValorEstimado, setNewValorEstimado] = useState(0);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValor, setEditValor] = useState('');
@@ -1788,6 +1955,7 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
   const [editRecHoras, setEditRecHoras] = useState<number>(0);
   const [editRecPlantilla, setEditRecPlantilla] = useState('');
   const [editDescDias, setEditDescDias] = useState<number>(0);
+  const [editValorEstimado, setEditValorEstimado] = useState(0);
   const [showStateDetails, setShowStateDetails] = useState(false);
   const showColorPicker = activeTab !== 'cursos';
 
@@ -1820,9 +1988,9 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
       setNewDesc(''); setNewAccion(''); setNewIcono('🔵'); setNewRecHoras(0); setNewRecPlantilla(''); setNewDescDias(0);
     } else {
       const tipo = activeTab === 'origenes' ? 'origen' : activeTab === 'cursos' ? 'curso' : 'operadora';
-      await fetch(`${apiUrl}/api/crm/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, valor: newValor.trim(), color: newColor, es_ganado: newEsGanado, es_perdido: newEsPerdido, orden: items.length }) });
+      await fetch(`${apiUrl}/api/crm/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, valor: newValor.trim(), color: newColor, es_ganado: newEsGanado, es_perdido: newEsPerdido, valor_estimado: activeTab === 'cursos' ? newValorEstimado : 0, orden: items.length }) });
     }
-    setNewValor(''); setNewColor('#6B7280'); setNewEsGanado(false); setNewEsPerdido(false);
+    setNewValor(''); setNewColor('#6B7280'); setNewEsGanado(false); setNewEsPerdido(false); setNewValorEstimado(0);
     fetchItems();
   };
 
@@ -1841,7 +2009,7 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
         })
       });
     } else {
-      await fetch(`${apiUrl}/api/crm/config/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valor: editValor, color: editColor, es_ganado: editEsGanado, es_perdido: editEsPerdido }) });
+      await fetch(`${apiUrl}/api/crm/config/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valor: editValor, color: editColor, es_ganado: editEsGanado, es_perdido: editEsPerdido, valor_estimado: activeTab === 'cursos' ? editValorEstimado : 0 }) });
     }
     setEditingId(null); fetchItems();
   };
@@ -1882,6 +2050,9 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <input value={editValor} onChange={e => setEditValor(e.target.value)} className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm" placeholder="Nombre..." />
+                      {activeTab === 'cursos' && (
+                        <input type="number" value={editValorEstimado || ''} onChange={e => setEditValorEstimado(parseFloat(e.target.value) || 0)} className="w-28 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f]" placeholder="Precio ($)..." />
+                      )}
                       {showColorPicker && <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-9 h-9 rounded-xl cursor-pointer border-0" />}
                       <div className="flex gap-1">
                         <button onClick={() => handleUpdate(item.id)} className="p-2 bg-[#002d2b] text-white rounded-xl shadow-sm"><Check className="w-4 h-4" /></button>
@@ -1934,7 +2105,14 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
                         {showColorPicker && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />}
-                        <span className="font-bold text-slate-800 text-sm">{item.icono} {item.valor}</span>
+                        <span className="font-bold text-slate-800 text-sm">
+                          {item.icono} {item.valor}
+                          {activeTab === 'cursos' && (
+                            <span className="text-xs text-[#00968f] font-semibold ml-2">
+                              ({new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(item.valor_estimado || 0)})
+                            </span>
+                          )}
+                        </span>
                         {item.es_ganado && <span className="text-[9px] font-black text-green-700 bg-green-100 px-2 py-0.5 rounded-full">GANADO</span>}
                         {item.es_perdido && <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">PERDIDO</span>}
                         {item.es_sistema && <span className="text-[9px] font-bold text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded-full">SISTEMA</span>}
@@ -1954,6 +2132,7 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
                         setEditRecHoras(item.recordatorio_horas || 0);
                         setEditRecPlantilla(item.id_plantilla_recordatorio || '');
                         setEditDescDias(item.inactividad_dias_descarte || 0);
+                        setEditValorEstimado(item.valor_estimado || 0);
                       }} 
                         className="p-2 text-slate-400 hover:text-[#00968f] hover:bg-white rounded-xl transition-all">
                         <Edit2 className="w-4 h-4" />
@@ -1976,6 +2155,9 @@ function ConfigModal({ config, apiUrl, onClose }: { config: CrmConfig; apiUrl: s
               <div className="flex items-center gap-3">
                 <input value={newIcono} onChange={e => setNewIcono(e.target.value)} placeholder="Icono" className="w-16 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
                 <input value={newValor} onChange={e => setNewValor(e.target.value)} placeholder="Nombre..." className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+                {activeTab === 'cursos' && (
+                  <input type="number" value={newValorEstimado || ''} onChange={e => setNewValorEstimado(parseFloat(e.target.value) || 0)} placeholder="Precio ($)..." className="w-28 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" />
+                )}
                 {showColorPicker && <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="w-11 h-11 rounded-xl cursor-pointer border-0 shadow-sm" />}
               </div>
               {activeTab === 'estados' && (
