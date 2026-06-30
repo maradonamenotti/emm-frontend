@@ -139,7 +139,8 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
 
   const [showPlantillas, setShowPlantillas] = useState(false);
   const [hideClosed, setHideClosed] = useState(false);
-  const [hideComments, setHideComments] = useState(true);
+  const [hideComments, setHideComments] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [hideGhosts, setHideGhosts] = useState(false);
   const [filterOrigen, setFilterOrigen] = useState('Todos');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -532,6 +533,15 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
               <p className="text-xs text-slate-500">{conversations.length}{hasMoreConversations ? '+' : ''} conversaciones</p>
             </div>
             <div className="flex items-center gap-1">
+              {!isReady && (
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition-colors animate-pulse"
+                  title="Conectar WhatsApp (Ver QR)"
+                >
+                  Conectar
+                </button>
+              )}
               <button onClick={logout} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600" title="Cerrar Sesión / Reset">
                 <LogOut className="w-4 h-4" />
               </button>
@@ -558,9 +568,9 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
               {hideClosed ? 'Limpios' : 'Abiertos'}
             </button>
 
-            <button onClick={() => setHideComments(!hideComments)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${hideComments ? 'bg-pink-100 text-pink-700 border-pink-200 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Ocultar comentarios de Instagram">
+            <button onClick={() => setHideComments(!hideComments)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${!hideComments ? 'bg-pink-100 text-pink-700 border-pink-200 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Mostrar u ocultar comentarios de Instagram">
               <Instagram className="w-3 h-3 shrink-0" />
-              {hideComments ? 'Sin Com. IG' : 'Ver Com. IG'}
+              {!hideComments ? 'Con Com. IG' : 'Sin Com. IG'}
             </button>
 
             <button onClick={() => setHideGhosts(!hideGhosts)} className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 border ${hideGhosts ? 'bg-red-100 text-red-700 border-red-200 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`} title="Ocultar contactos sin teléfono ni email">
@@ -703,22 +713,45 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
 
           {/* 3. EL HISTORIAL DE MENSAJES (El único que scrollea) */}
           <div ref={chatContainerRef} onScroll={handleChatScroll} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 relative bg-chat-bg custom-scrollbar">
-            {qrCode && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm p-8 text-center">
-                <div className="bg-white p-4 rounded-2xl shadow-xl border border-slate-200 mb-6">
-                  <QRCodeCanvas value={qrCode} size={256} />
-                </div>
-                <h4 className="text-xl font-black text-slate-900 mb-2">Conectar WhatsApp</h4>
-                <p className="text-sm text-slate-600 max-w-xs mx-auto">Escanea el código QR para vincular tu cuenta.</p>
+            {!selected ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/50 p-8 text-center">
+                {qrCode ? (
+                  <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-200 flex flex-col items-center max-w-sm">
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 mb-4">
+                      <QRCodeCanvas value={qrCode} size={200} />
+                    </div>
+                    <h4 className="text-lg font-black text-slate-900 mb-1">Conectar WhatsApp</h4>
+                    <p className="text-xs text-slate-500 mb-4">Escanea el código QR con tu celular para poder responder mensajes de WhatsApp.</p>
+                    <button onClick={() => setShowQrModal(true)} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+                      Ver en grande
+                    </button>
+                  </div>
+                ) : !isReady && !conversations.length ? (
+                  <div className="flex flex-col items-center">
+                    <RefreshCw className="w-8 h-8 text-[#00968f] animate-spin mb-4" />
+                    <p className="text-sm text-slate-600 font-bold">Iniciando cliente...</p>
+                  </div>
+                ) : (
+                  <div className="max-w-xs">
+                    <MessageCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h4 className="text-base font-black text-slate-700 mb-1">Selecciona una conversación</h4>
+                    <p className="text-xs text-slate-400">Elige un chat de la lista para ver el historial y responder.</p>
+                  </div>
+                )}
               </div>
-            )}
-
-            {!qrCode && !isReady && !conversations.length && (
-               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 p-8 text-center">
-                  <RefreshCw className="w-8 h-8 text-[#00968f] animate-spin mb-4" />
-                  <p className="text-sm text-slate-600 font-bold">Iniciando cliente...</p>
-               </div>
-            )}
+            ) : (
+              <>
+                {getConversationChannel(selected) === 'WhatsApp' && !isReady && (
+                  <div className="flex justify-center mb-4">
+                    <div className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800 flex items-center gap-2 shadow-sm max-w-md w-full">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                      <span className="flex-1 text-left">WhatsApp está desconectado. Para responder por este medio debes conectarlo.</span>
+                      <button onClick={() => setShowQrModal(true)} className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-bold transition-colors shrink-0">
+                        Conectar
+                      </button>
+                    </div>
+                  </div>
+                )}
 
             {selected && loadingOlderMessages && (
               <div className="flex justify-center">
@@ -760,7 +793,9 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
             ))}
             {/* Div invisible al final para anclar el scroll */}
             <div ref={scrollEndRef} className="h-2 w-full flex-none" />
-          </div>
+            </>
+            )}
+           </div>
 
           {/* 4. EL FOOTER / INPUT (Fijo) */}
           <div className="flex-none p-4 border-t border-slate-200 bg-white relative">
@@ -937,6 +972,37 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
           )}
         </aside>
       </section>
+
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col p-6 text-center relative border border-slate-200 animate-in zoom-in-95 duration-200">
+            <button onClick={() => setShowQrModal(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-black text-slate-900 mb-4">Conectar WhatsApp</h3>
+            {qrCode ? (
+              <div className="flex flex-col items-center">
+                <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-200 mb-4">
+                  <QRCodeCanvas value={qrCode} size={256} />
+                </div>
+                <p className="text-sm text-slate-600 max-w-xs mx-auto mb-4">Escanea el código QR con tu celular para vincular tu cuenta.</p>
+              </div>
+            ) : isReady ? (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <Check className="w-8 h-8" />
+                </div>
+                <p className="text-sm font-bold text-emerald-700">¡WhatsApp ya está conectado y listo!</p>
+              </div>
+            ) : (
+              <div className="py-8 flex flex-col items-center gap-3">
+                <RefreshCw className="w-8 h-8 text-[#00968f] animate-spin mb-2" />
+                <p className="text-sm text-slate-600 font-bold">Iniciando cliente...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

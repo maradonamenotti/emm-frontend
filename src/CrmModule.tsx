@@ -203,7 +203,7 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
   const [filterAsignado, setFilterAsignado] = useState('');
   const [filterCurso, setFilterCurso] = useState('');
   const [hideGhosts, setHideGhosts] = useState(true);
-  const [hideComments, setHideComments] = useState(true);
+  const [hideComments, setHideComments] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     const r = await fetch(`${apiUrl}/api/crm/config`);
@@ -1203,20 +1203,20 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
           title="Ocultar prospectos que no tienen teléfono ni email"
         >
           <Ghost className="w-3.5 h-3.5" />
-          {hideGhosts ? 'Sin Contacto Ocultos' : 'Mostrar Sin Contacto'}
+          {hideGhosts ? 'Sin Contacto: Ocultos' : 'Sin Contacto: Visibles'}
         </button>
 
         <button
           onClick={() => setHideComments(!hideComments)}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
-            hideComments
+            !hideComments
               ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-sm'
               : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
           }`}
-          title="Ocultar comentarios de Instagram"
+          title="Mostrar u ocultar comentarios de Instagram"
         >
           <Instagram className="w-3.5 h-3.5" />
-          {hideComments ? 'Comentarios IG Ocultos' : 'Mostrar Comentarios IG'}
+          {!hideComments ? 'Comentarios IG: Visibles' : 'Comentarios IG: Ocultos'}
         </button>
       </div>
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1318,20 +1318,20 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
           title="Ocultar prospectos que no tienen teléfono ni email"
         >
           <Ghost className="w-3.5 h-3.5" />
-          {hideGhosts ? 'Sin Contacto Ocultos' : 'Mostrar Sin Contacto'}
+          {hideGhosts ? 'Sin Contacto: Ocultos' : 'Sin Contacto: Visibles'}
         </button>
 
         <button
           onClick={() => setHideComments(!hideComments)}
           className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${
-            hideComments
+            !hideComments
               ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-sm'
               : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
           }`}
-          title="Ocultar comentarios de Instagram"
+          title="Mostrar u ocultar comentarios de Instagram"
         >
           <Instagram className="w-3.5 h-3.5" />
-          {hideComments ? 'Comentarios IG Ocultos' : 'Mostrar Comentarios IG'}
+          {!hideComments ? 'Comentarios IG: Visibles' : 'Comentarios IG: Ocultos'}
         </button>
 
         {(filterEstado || filterOrigen || filterAsignado || filterCurso || searchTerm) && (
