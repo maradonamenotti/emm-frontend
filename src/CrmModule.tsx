@@ -49,6 +49,8 @@ export interface Prospecto {
   silenciar_automatizaciones?: boolean;
   etiquetas?: string[];
   motivo_perdida?: string;
+  fecha_ultimo_mensaje_cliente?: string;
+  fecha_ultimo_mensaje_sistema?: string;
 }
 interface Stats {
   total: number; inscriptos: number; descartados: number; activos: number;
@@ -94,11 +96,20 @@ function bgLighten(hex: string) { return hex + '22'; }
 
 // ─── Helpers de actividad ────────────────────────────────────────────────────
 function getLastContact(p: Prospecto): Date | null {
-  if (!p.historial || p.historial.length === 0) return null;
-  const sorted = [...p.historial].sort((a, b) =>
-    new Date(b.fecha_contacto).getTime() - new Date(a.fecha_contacto).getTime()
-  );
-  return new Date(sorted[0].fecha_contacto);
+  const dates: number[] = [];
+  if (p.historial && p.historial.length > 0) {
+    p.historial.forEach(h => {
+      if (h.fecha_contacto) dates.push(new Date(h.fecha_contacto).getTime());
+    });
+  }
+  if (p.fecha_ultimo_mensaje_sistema) {
+    dates.push(new Date(p.fecha_ultimo_mensaje_sistema).getTime());
+  }
+  if (p.fecha_ultimo_mensaje_cliente) {
+    dates.push(new Date(p.fecha_ultimo_mensaje_cliente).getTime());
+  }
+  if (dates.length === 0) return null;
+  return new Date(Math.max(...dates));
 }
 
 function getDaysAgo(date: Date | null): number | null {
@@ -196,6 +207,12 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
   const [lossModal, setLossModal] = useState<{ id: string, estado: string } | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [waInitialId, setWaInitialId] = useState<string | undefined>();
+
+  const handleOpenInWA = (prospectoId: string) => {
+    setSelectedProspecto(null);
+    setWaInitialId(prospectoId);
+    onNavigate?.('whatsapp');
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
@@ -417,9 +434,9 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pb-4">
-          {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={async (id) => { await openProspecto(id); onNavigate?.('lista'); }} apiUrl={apiUrl} onRefresh={refreshAll} />}
-          {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} />}
-          {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} filterCurso={filterCurso} setFilterCurso={setFilterCurso} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} />}
+          {subView === 'dashboard' && <DashboardView stats={stats} config={config} onOpenProspecto={async (id) => { await openProspecto(id); onNavigate?.('lista'); }} apiUrl={apiUrl} onRefresh={refreshAll} onOpenInWA={handleOpenInWA} />}
+          {subView === 'kanban' && <KanbanView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} onOpenInWA={handleOpenInWA} />}
+          {subView === 'lista' && <ListaView prospectos={filtered} config={config} canEdit={canEdit} onEstadoChange={handleUpdateEstado} onOpen={openProspecto} onDelete={handleDelete} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterEstado={filterEstado} setFilterEstado={setFilterEstado} filterOrigen={filterOrigen} setFilterOrigen={setFilterOrigen} filterAsignado={filterAsignado} setFilterAsignado={setFilterAsignado} filterCurso={filterCurso} setFilterCurso={setFilterCurso} hideGhosts={hideGhosts} setHideGhosts={setHideGhosts} hideComments={hideComments} setHideComments={setHideComments} onOpenInWA={handleOpenInWA} />}
           {subView === 'plantillas' && <PlantillasView plantillas={plantillas} config={config} canEdit={canEdit} apiUrl={apiUrl} onRefresh={fetchPlantillas} />}
         </div>
       )}
@@ -574,6 +591,7 @@ function MotivoPerdidaModal({ onClose, onConfirm }: { onClose: () => void, onCon
 // MODAL IMPORTAR EXCEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: string; config: CrmConfig; onClose: () => void; onSuccess: () => void }) {
+  const [importType, setImportType] = useState<'new_leads' | 'quinttos'>('new_leads');
   const [file, setFile] = useState<File | null>(null);
   const [curso, setCurso] = useState('');
   const [loading, setLoading] = useState(false);
@@ -581,21 +599,25 @@ function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: st
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return toast.error('Selecciona un archivo Excel');
-    if (!curso) return toast.error('Selecciona un curso para asignar a estos leads');
+    if (importType === 'new_leads' && !curso) return toast.error('Selecciona un curso para asignar a estos leads');
 
     setLoading(true);
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('curso', curso);
+    if (importType === 'new_leads') {
+      formData.append('curso', curso);
+    }
+
+    const endpoint = importType === 'new_leads' ? 'importar-excel' : 'importar-quinttos';
 
     try {
-      const r = await fetch(`${apiUrl}/api/crm/prospectos/importar-excel`, {
+      const r = await fetch(`${apiUrl}/api/crm/prospectos/${endpoint}`, {
         method: 'POST',
         body: formData,
       });
       if (r.ok) {
         const data = await r.json();
-        toast.success(data.message || 'Importación completada');
+        toast.success(data.message || 'Importación completada con éxito');
         onSuccess();
       } else {
         const err = await r.json();
@@ -618,13 +640,40 @@ function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: st
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white rounded-xl"><X className="w-5 h-5" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <p className="text-sm text-slate-600 mb-2">
-            El archivo debe tener las columnas (o similares): <br/>
-            <b>NOMBRE COMPLETO, EMAIL, WHATSAPP_NUMBER</b>
-          </p>
+        
+        <div className="px-6 pt-4">
+          <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
+            <button
+              type="button"
+              onClick={() => { setImportType('new_leads'); setFile(null); }}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex-1 ${importType === 'new_leads' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Nuevos Leads
+            </button>
+            <button
+              type="button"
+              onClick={() => { setImportType('quinttos'); setFile(null); }}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex-1 ${importType === 'quinttos' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              Matchear Alumnos (Quinttos)
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 pt-4 space-y-4">
+          {importType === 'new_leads' ? (
+            <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              El archivo debe tener las columnas (o similares): <br/>
+              <strong className="text-slate-700">NOMBRE COMPLETO, EMAIL, WHATSAPP_NUMBER</strong>
+            </p>
+          ) : (
+            <p className="text-xs text-slate-500 bg-emerald-50/30 p-3 rounded-xl border border-emerald-100">
+              Sube la lista de Quinttos. Buscaremos coincidencias por <strong className="text-emerald-800">Email, Teléfono</strong> o <strong className="text-emerald-800">Nombre completo</strong> en el CRM para marcarlos como <strong className="text-emerald-800">Inscripto</strong> y ex-alumno automáticamente.
+            </p>
+          )}
+          
           <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Archivo Excel (.xlsx, .csv)</label>
+            <label className="text-xs font-bold text-slate-500 block mb-1">Archivo Excel (.xlsx, .xls, .csv)</label>
             <input 
               type="file" 
               accept=".xlsx,.xls,.csv" 
@@ -632,17 +681,21 @@ function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: st
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-[#00968f] outline-none" 
             />
           </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-1">Asignar al Curso de Interés</label>
-            <select value={curso} onChange={e => setCurso(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
-              <option value="">Seleccione el curso...</option>
-              {config.cursos.map(c => <option key={c.id} value={c.valor}>{c.valor}</option>)}
-            </select>
-          </div>
+
+          {importType === 'new_leads' && (
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">Asignar al Curso de Interés</label>
+              <select value={curso} onChange={e => setCurso(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
+                <option value="">Seleccione el curso...</option>
+                {config.cursos.map(c => <option key={c.id} value={c.valor}>{c.valor}</option>)}
+              </select>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all">Cancelar</button>
             <button disabled={loading} type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg">
-              {loading ? 'Importando...' : 'Importar Ahora'}
+              {loading ? 'Procesando...' : importType === 'new_leads' ? 'Importar Leads' : 'Matchear Alumnos'}
             </button>
           </div>
         </form>
@@ -654,7 +707,7 @@ function ImportarExcelModal({ apiUrl, config, onClose, onSuccess }: { apiUrl: st
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD KPIs
 // ═══════════════════════════════════════════════════════════════════════════════
-function DashboardView({ stats, config, onOpenProspecto, apiUrl, onRefresh }: { stats: Stats | null; config: CrmConfig; onOpenProspecto: (id: string) => void; apiUrl?: string; onRefresh?: () => void }) {
+function DashboardView({ stats, config, onOpenProspecto, apiUrl, onRefresh, onOpenInWA }: { stats: Stats | null; config: CrmConfig; onOpenProspecto: (id: string) => void; apiUrl?: string; onRefresh?: () => void; onOpenInWA: (id: string) => void }) {
   const [showEstados, setShowEstados] = useState(false);
 
   const handleSnooze = async (id: string, dias: number) => {
@@ -835,9 +888,9 @@ function DashboardView({ stats, config, onOpenProspecto, apiUrl, onRefresh }: { 
                 </div>
                 <div className="flex items-center gap-3">
                   {a.telefono && (
-                    <a href={`https://wa.me/${a.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="p-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-all">
+                    <button onClick={() => onOpenInWA(a.prospecto_id)} className="p-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-all" title="Ir a la conversación de WhatsApp">
                       <MessageCircle className="w-4 h-4" />
-                    </a>
+                    </button>
                   )}
                   <button onClick={() => onOpenProspecto(a.prospecto_id)} className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1.5 rounded-lg font-semibold transition-all">
                     Ver detalle
@@ -1051,7 +1104,7 @@ function PlantillaModal({ plantilla, config, apiUrl, onClose, onSave }: { planti
 // ═══════════════════════════════════════════════════════════════════════════════
 // KANBAN
 // ═══════════════════════════════════════════════════════════════════════════════
-function KanbanDraggableCard({ p, onOpen, config, canEdit, onEstadoChange, isOverlay }: any) {
+function KanbanDraggableCard({ p, onOpen, config, canEdit, onEstadoChange, isOverlay, onOpenInWA }: any) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: p.id,
     data: { prospecto: p }
@@ -1085,9 +1138,9 @@ function KanbanDraggableCard({ p, onOpen, config, canEdit, onEstadoChange, isOve
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
         <div className="flex items-center gap-1.5">
           {p.telefono && (
-            <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} className="p-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-all relative z-10">
+            <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onOpenInWA(p.id); }} className="p-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-all relative z-10" title="Ir a la conversación de WhatsApp">
               <MessageCircle className="w-3.5 h-3.5" />
-            </a>
+            </button>
           )}
           <ActivityBadge p={p} />
         </div>
@@ -1102,7 +1155,7 @@ function KanbanDraggableCard({ p, onOpen, config, canEdit, onEstadoChange, isOve
   );
 }
 
-function KanbanDroppableColumn({ estado, col, collapsedCols, setCollapsedCols, config, canEdit, onEstadoChange, onOpen }: any) {
+function KanbanDroppableColumn({ estado, col, collapsedCols, setCollapsedCols, config, canEdit, onEstadoChange, onOpen, onOpenInWA }: any) {
   const { setNodeRef, isOver } = useDroppable({
     id: estado.valor,
   });
@@ -1122,7 +1175,7 @@ function KanbanDroppableColumn({ estado, col, collapsedCols, setCollapsedCols, c
         {!collapsed && (
           <div ref={setNodeRef} className={`min-h-[120px] p-2 space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar transition-colors ${isOver ? 'bg-slate-200/50 ring-2 ring-inset ring-slate-300' : 'bg-slate-50'}`}>
             {col.map((p: any) => (
-              <KanbanDraggableCard key={p.id} p={p} config={config} canEdit={canEdit} onEstadoChange={onEstadoChange} onOpen={onOpen} />
+              <KanbanDraggableCard key={p.id} p={p} config={config} canEdit={canEdit} onEstadoChange={onEstadoChange} onOpen={onOpen} onOpenInWA={onOpenInWA} />
             ))}
             {col.length === 0 && <p className="text-center text-slate-400 text-xs py-8 pointer-events-none">Arrastrar prospectos aquí</p>}
           </div>
@@ -1132,13 +1185,14 @@ function KanbanDroppableColumn({ estado, col, collapsedCols, setCollapsedCols, c
   );
 }
 
-function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searchTerm, setSearchTerm, hideGhosts, setHideGhosts, hideComments, setHideComments }: {
+function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searchTerm, setSearchTerm, hideGhosts, setHideGhosts, hideComments, setHideComments, onOpenInWA }: {
   prospectos: Prospecto[]; config: CrmConfig; canEdit: boolean;
   onEstadoChange: (id: string, estado: string) => void;
   onOpen: (id: string) => void; onDelete: (id: string) => void;
   searchTerm: string; setSearchTerm: (v: string) => void;
   hideGhosts: boolean; setHideGhosts: (v: boolean) => void;
   hideComments: boolean; setHideComments: (v: boolean) => void;
+  onOpenInWA: (id: string) => void;
 }) {
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(new Set(['Descartado']));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1227,7 +1281,7 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
               <KanbanDroppableColumn 
                 key={estado.id} estado={estado} col={col} 
                 collapsedCols={collapsedCols} setCollapsedCols={setCollapsedCols} 
-                config={config} canEdit={canEdit} onEstadoChange={onEstadoChange} onOpen={onOpen} 
+                config={config} canEdit={canEdit} onEstadoChange={onEstadoChange} onOpen={onOpen} onOpenInWA={onOpenInWA}
               />
             );
           })}
@@ -1235,7 +1289,7 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
         <DragOverlay zIndex={1000}>
           {activeProspecto ? (
             <div className="w-72">
-              <KanbanDraggableCard p={activeProspecto} config={config} canEdit={canEdit} onEstadoChange={onEstadoChange} onOpen={onOpen} isOverlay />
+              <KanbanDraggableCard p={activeProspecto} config={config} canEdit={canEdit} onEstadoChange={onEstadoChange} onOpen={onOpen} onOpenInWA={onOpenInWA} isOverlay />
             </div>
           ) : null}
         </DragOverlay>
@@ -1247,7 +1301,7 @@ function KanbanView({ prospectos, config, canEdit, onEstadoChange, onOpen, searc
 // ═══════════════════════════════════════════════════════════════════════════════
 // LISTA
 // ═══════════════════════════════════════════════════════════════════════════════
-function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDelete, searchTerm, setSearchTerm, filterEstado, setFilterEstado, filterOrigen, setFilterOrigen, filterAsignado, setFilterAsignado, filterCurso, setFilterCurso, hideGhosts, setHideGhosts, hideComments, setHideComments }: any) {
+function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDelete, searchTerm, setSearchTerm, filterEstado, setFilterEstado, filterOrigen, setFilterOrigen, filterAsignado, setFilterAsignado, filterCurso, setFilterCurso, hideGhosts, setHideGhosts, hideComments, setHideComments, onOpenInWA }: any) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   return (
@@ -1288,9 +1342,9 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
       )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative max-w-xs flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Nombre, teléfono, email, país..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none text-sm" />
+          <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#00968f] outline-none text-sm" />
         </div>
         <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-[#00968f] outline-none">
           <option value="">Todos los estados</option>
@@ -1373,9 +1427,9 @@ function ListaView({ prospectos, config, canEdit, onEstadoChange, onOpen, onDele
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
                       {p.telefono && (
-                        <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-green-600 hover:underline flex items-center gap-1 text-xs font-medium">
+                        <button onClick={e => { e.stopPropagation(); onOpenInWA(p.id); }} className="text-green-600 hover:underline flex items-center gap-1 text-xs font-medium text-left" title="Ir a la conversación de WhatsApp">
                           <MessageCircle className="w-3 h-3" />{p.telefono}
-                        </a>
+                        </button>
                       )}
                       {p.email && <span className="text-slate-400 text-xs">{p.email}</span>}
                     </div>
