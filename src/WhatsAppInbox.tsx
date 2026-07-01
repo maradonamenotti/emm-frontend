@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell, Paperclip } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Plantilla } from './CrmModule';
 
@@ -774,12 +774,28 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                   <div className="text-sm leading-relaxed whitespace-pre-wrap break-words text-left">
                     {(() => {
                       const text = message.cuerpo_mensaje;
-                      const match = text.match(/^\[Adjunto (image|video|audio)\]\((https?:\/\/[^\)]+)\)$/i);
+                      const match = text.match(/^\[Adjunto (image|video|audio|document)\]\((https?:\/\/[^\)]+)\)$/i);
                       if (match) {
                         const [, type, url] = match;
                         if (type.toLowerCase() === 'image') return <img src={url} alt="Adjunto" className="max-w-full rounded-lg max-h-64 object-contain" />;
                         if (type.toLowerCase() === 'video') return <video src={url} controls className="max-w-full rounded-lg max-h-64" />;
                         if (type.toLowerCase() === 'audio') return <audio src={url} controls className="max-w-full" />;
+                        if (type.toLowerCase() === 'document') {
+                          const filename = decodeURIComponent(url.split('/').pop() || 'documento');
+                          return (
+                            <a 
+                              href={url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex items-center gap-2 p-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-800 font-bold transition-all text-xs border border-slate-200 shadow-sm max-w-xs"
+                              title="Descargar documento"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <Paperclip className="w-4 h-4 shrink-0 text-slate-600" />
+                              <span className="truncate">{filename}</span>
+                            </a>
+                          );
+                        }
                       }
                       return text;
                     })()}
