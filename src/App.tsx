@@ -3385,18 +3385,7 @@ function AppContent() {
         )}
 
         {/* Bandeja WA: ocupa TODO el espacio sin header ni padding */}
-        {isCrmWa ? (
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <CrmModule
-              apiUrl={API_URL}
-              isSuperadmin={isSuperadmin}
-              userPermissions={user?.permissions}
-              subView="whatsapp"
-              onNavigate={(v) => setActiveTab(v === 'lista' ? 'crm-lista' : `crm-${v}` as any)}
-            />
-          </div>
-        ) : isCrmTab ? (
-          /* Otras vistas CRM: con padding, scrollable dentro de CrmModule */
+        {isCrmTab ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             <CrmModule
               apiUrl={API_URL}

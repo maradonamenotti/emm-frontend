@@ -254,6 +254,11 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
   }, [fetchConfig, fetchProspectos, fetchStats, fetchPlantillas]);
 
   useEffect(() => { refreshAll(); }, [refreshAll]);
+  useEffect(() => {
+    if (subView !== 'whatsapp') {
+      setWaInitialId(undefined);
+    }
+  }, [subView]);
   useEffect(() => { fetchProspectos(); }, [filterEstado, filterOrigen, filterAsignado, filterCurso]);
 
   useEffect(() => {
