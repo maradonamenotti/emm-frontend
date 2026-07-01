@@ -212,7 +212,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
       setHasMoreConversations(!Array.isArray(data) && Boolean(data.hasMore));
       setConversations(prev => reset ? next : mergeConversations(prev, next));
       if (reset) {
-        setSelectedId(prev => prev && next.some(item => item.id === prev) ? prev : next[0]?.id || '');
+        setSelectedId(prev => prev ? prev : (next[0]?.id || ''));
       }
     } catch {
       toast.error('No se pudo cargar la bandeja WhatsApp');
