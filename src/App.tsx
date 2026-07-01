@@ -3392,7 +3392,7 @@ function AppContent() {
               isSuperadmin={isSuperadmin}
               userPermissions={user?.permissions}
               subView={crmSubView}
-              onNavigate={(v) => setActiveTab(v === 'lista' ? 'crm-lista' : `crm-${v}` as any)}
+              onNavigate={(v) => setActiveTab(v === 'lista' ? 'crm-lista' : v === 'whatsapp' ? 'crm-wa' : `crm-${v}` as any)}
             />
           </div>
         ) : (
