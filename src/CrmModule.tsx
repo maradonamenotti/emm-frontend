@@ -435,7 +435,7 @@ export default function CrmModule({ apiUrl, isSuperadmin, userPermissions, subVi
       {/* CONTENIDO */}
       {subView === 'whatsapp' ? (
         <div className="flex-1 min-h-0 overflow-hidden">
-          <WhatsAppInbox apiUrl={apiUrl} estados={config.estados.map(item => item.valor)} canEdit={canEdit} onCrmChanged={() => { fetchProspectos(); fetchStats(); }} initialId={waInitialId} plantillas={plantillas} />
+          <WhatsAppInbox apiUrl={apiUrl} estados={config.estados.map(item => item.valor)} cursos={config.cursos.map(item => item.valor)} canEdit={canEdit} onCrmChanged={() => { fetchProspectos(); fetchStats(); }} initialId={waInitialId} plantillas={plantillas} />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pb-4">

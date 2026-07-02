@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell, Paperclip, Plus, Mail } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell, Paperclip, Plus, Mail, PanelRight } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Plantilla } from './CrmModule';
 
@@ -53,6 +53,7 @@ interface MessagePage {
 interface Props {
   apiUrl: string;
   estados: string[];
+  cursos?: string[];
   canEdit: boolean;
   onCrmChanged: () => void;
   initialId?: string;
@@ -120,7 +121,7 @@ const upsertConversation = (items: WhatsAppConversation[], next: WhatsAppConvers
   return mergeConversations(items, [next]);
 };
 
-export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, initialId, plantillas = [] }: Props) {
+export default function WhatsAppInbox({ apiUrl, estados, cursos = [], canEdit, onCrmChanged, initialId, plantillas = [] }: Props) {
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
@@ -151,6 +152,8 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   const [notas, setNotas] = useState('');
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
+  const [cursoInteres, setCursoInteres] = useState('');
+  const [showSidebar, setShowSidebar] = useState(true);
   const [showInlineTagInput, setShowInlineTagInput] = useState(false);
   const [inlineTagDraft, setInlineTagDraft] = useState('');
   const inlineTagInputRef = useRef<HTMLInputElement>(null);
@@ -435,6 +438,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
     setTelefono(selected.telefono || '');
     setEstado(selected.estado || 'Nuevo');
     setNotas(selected.notas_generales || '');
+    setCursoInteres(selected.curso_interes || '');
     setEtiquetas(normalizeTags(selected.etiquetas || []));
     setTagDraft('');
   }, [selected]);
@@ -458,7 +462,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
       const response = await fetch(`${apiUrl}/api/crm/prospectos/${selected.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: next }),
+        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: next, curso_interes: cursoInteres }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -481,7 +485,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
       const response = await fetch(`${apiUrl}/api/crm/prospectos/${selected.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: next }),
+        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: next, curso_interes: cursoInteres }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -503,7 +507,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
       const response = await fetch(`${apiUrl}/api/crm/prospectos/${selected.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: normalizeTags(etiquetas) }),
+        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: normalizeTags(etiquetas), curso_interes: cursoInteres }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || data.error || 'No se pudo guardar');
@@ -746,7 +750,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
         </div>
       </section>
 
-      <section className="grid grid-cols-[minmax(0,1fr)_320px] min-w-0 min-h-0 h-full overflow-hidden">
+      <section className={`grid min-w-0 min-h-0 h-full overflow-hidden transition-all duration-300 ${showSidebar ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-[minmax(0,1fr)]'}`}>
         {/* 1. EL CONTENEDOR PRINCIPAL DE LA COLUMNA */}
         <div className="flex flex-col h-full min-h-0 min-w-0 bg-chat-bg overflow-hidden">
           {/* 2. EL HEADER (Fijo) */}
@@ -780,6 +784,13 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                           title="Marcar como no leído"
                         >
                           <Mail className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => setShowSidebar(prev => !prev)} 
+                          className={`p-1 rounded transition-colors ${showSidebar ? 'bg-slate-200 text-[#00968f]' : 'bg-slate-100 text-slate-400 hover:text-[#00968f]'}`} 
+                          title={showSidebar ? "Ocultar espacio de trabajo" : "Mostrar espacio de trabajo"}
+                        >
+                          <PanelRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     )}
@@ -1019,52 +1030,70 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
           </div>
         </div>
 
-        <aside className="border-l border-slate-200 bg-white p-5 min-h-0 overflow-y-auto custom-scrollbar">
-          <h3 className="text-sm font-black text-slate-900 mb-4">Espacio de trabajo</h3>
-          {!selected ? (
-            <p className="text-sm text-slate-500">Selecciona una conversacion para editar el embudo y las notas internas.</p>
-          ) : (
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre</label>
-                  <input disabled={!canEdit} value={nombre} onChange={event => setNombre(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50" />
+        {showSidebar && (
+          <aside className="border-l border-slate-200 bg-white p-5 min-h-0 overflow-y-auto custom-scrollbar flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-black text-slate-900">Espacio de trabajo</h3>
+              <button 
+                onClick={() => setShowSidebar(false)} 
+                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                title="Cerrar panel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {!selected ? (
+              <p className="text-sm text-slate-500">Selecciona una conversacion para editar el embudo y las notas internas.</p>
+            ) : (
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre</label>
+                    <input disabled={!canEdit} value={nombre} onChange={event => setNombre(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Apellido</label>
+                    <input disabled={!canEdit} value={apellido} onChange={event => setApellido(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Apellido</label>
-                  <input disabled={!canEdit} value={apellido} onChange={event => setApellido(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50" />
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                  {selected && getConversationChannel(selected) !== 'WhatsApp' ? `ID de ${getConversationChannel(selected)}` : 'Teléfono (WhatsApp)'}
-                </label>
-                <div className="relative">
-                  <input 
-                    disabled={!canEdit || (selected && getConversationChannel(selected) !== 'WhatsApp')} 
-                    value={telefono.includes('@lid') ? 'Número oculto (Privacidad)' : telefono} 
-                    onChange={event => !telefono.includes('@lid') && setTelefono(event.target.value)} 
-                    className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 ${(!canEdit || (selected && getConversationChannel(selected) !== 'WhatsApp') || telefono.includes('@lid')) ? 'bg-slate-50 text-slate-400 italic cursor-not-allowed' : 'bg-white'}`} 
-                  />
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                    {selected && getConversationChannel(selected) !== 'WhatsApp' ? `ID de ${getConversationChannel(selected)}` : 'Teléfono (WhatsApp)'}
+                  </label>
+                  <div className="relative">
+                    <input 
+                      disabled={!canEdit || (selected && getConversationChannel(selected) !== 'WhatsApp')} 
+                      value={telefono.includes('@lid') ? 'Número oculto (Privacidad)' : telefono} 
+                      onChange={event => !telefono.includes('@lid') && setTelefono(event.target.value)} 
+                      className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0ffff4]/60 ${(!canEdit || (selected && getConversationChannel(selected) !== 'WhatsApp') || telefono.includes('@lid')) ? 'bg-slate-50 text-slate-400 italic cursor-not-allowed' : 'bg-white'}`} 
+                    />
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-400 italic">
+                    {selected && getConversationChannel(selected) !== 'WhatsApp' ? (
+                      `Identificador único del usuario en ${getConversationChannel(selected)}.`
+                    ) : (
+                      telefono.includes('@lid') 
+                        ? 'Este contacto tiene activada la privacidad de WhatsApp.' 
+                        : 'Formato internacional sin el + (ej: 54911...)'
+                    )}
+                  </p>
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400 italic">
-                  {selected && getConversationChannel(selected) !== 'WhatsApp' ? (
-                    `Identificador único del usuario en ${getConversationChannel(selected)}.`
-                  ) : (
-                    telefono.includes('@lid') 
-                      ? 'Este contacto tiene activada la privacidad de WhatsApp.' 
-                      : 'Formato internacional sin el + (ej: 54911...)'
-                  )}
-                </p>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Estado del CRM</label>
-                <select disabled={!canEdit} value={estado} onChange={event => setEstado(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50">
-                  {(estados.length ? estados : ['Nuevo', 'Primer Contacto', 'En Seguimiento', 'Formulario QUINTTOS completado', 'Inscripto', 'Descartado']).map(item => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Estado del CRM</label>
+                  <select disabled={!canEdit} value={estado} onChange={event => setEstado(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50">
+                    {(estados.length ? estados : ['Nuevo', 'Primer Contacto', 'En Seguimiento', 'Formulario QUINTTOS completado', 'Inscripto', 'Descartado']).map(item => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Curso de Interés</label>
+                  <select disabled={!canEdit} value={cursoInteres} onChange={event => setCursoInteres(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-[#0ffff4]/60 disabled:bg-slate-50">
+                    <option value="">Sin especificar</option>
+                    {cursos.map(item => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Etiquetas de atención</label>
@@ -1134,6 +1163,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
             </div>
           )}
         </aside>
+      )}
       </section>
 
       {showQrModal && (
