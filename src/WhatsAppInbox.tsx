@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type UIEvent } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
-import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell, Paperclip } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Save, Send, Tag, X, Facebook, Instagram, Trash2, Zap, LogOut, Ghost, Bell, Paperclip, Plus, Mail } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Plantilla } from './CrmModule';
 
@@ -151,6 +151,9 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
   const [notas, setNotas] = useState('');
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
+  const [showInlineTagInput, setShowInlineTagInput] = useState(false);
+  const [inlineTagDraft, setInlineTagDraft] = useState('');
+  const inlineTagInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const selectedIdRef = useRef('');
@@ -309,6 +312,25 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
     }
   };
 
+  const markConversationUnread = async (prospectoId: string) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/whatsapp/unread`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospecto_id: prospectoId }),
+      });
+      const data: WhatsAppConversation = await response.json();
+      if (data?.id) {
+        setConversations(prev => upsertConversation(prev, data));
+        toast.success('Conversación marcada como no leída');
+      } else {
+        throw new Error('Invalid response');
+      }
+    } catch {
+      toast.error('No se pudo marcar como no leído');
+    }
+  };
+
   useEffect(() => {
     loadConversations();
   }, [apiUrl]);
@@ -417,16 +439,61 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
     setTagDraft('');
   }, [selected]);
 
-  const addTag = () => {
-    if (!canEdit) return;
-    const next = normalizeTags([...etiquetas, tagDraft]);
+  useEffect(() => {
+    if (showInlineTagInput && inlineTagInputRef.current) {
+      inlineTagInputRef.current.focus();
+    }
+  }, [showInlineTagInput]);
+
+  const addTag = async (tagText?: string) => {
+    if (!selected || !canEdit) return;
+    const newTag = (typeof tagText === 'string' ? tagText : tagDraft).trim();
+    if (!newTag) return;
+    const next = normalizeTags([...etiquetas, newTag]);
     setEtiquetas(next);
-    setTagDraft('');
+    if (typeof tagText !== 'string') {
+      setTagDraft('');
+    }
+    try {
+      const response = await fetch(`${apiUrl}/api/crm/prospectos/${selected.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: next }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(prev => upsertConversation(prev, { ...selected, ...data }));
+        toast.success(`Etiqueta "${newTag}" agregada`);
+      } else {
+        throw new Error('Error saving tag');
+      }
+    } catch {
+      toast.error('No se pudo guardar la etiqueta');
+      setEtiquetas(normalizeTags(selected.etiquetas || []));
+    }
   };
 
-  const removeTag = (tag: string) => {
-    if (!canEdit) return;
-    setEtiquetas(prev => prev.filter(item => item.toLowerCase() !== tag.toLowerCase()));
+  const removeTag = async (tag: string) => {
+    if (!selected || !canEdit) return;
+    const next = etiquetas.filter(item => item.toLowerCase() !== tag.toLowerCase());
+    setEtiquetas(next);
+    try {
+      const response = await fetch(`${apiUrl}/api/crm/prospectos/${selected.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, apellido, telefono, estado, notas_generales: notas, etiquetas: next }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(prev => upsertConversation(prev, { ...selected, ...data }));
+        toast.success(`Etiqueta "${tag}" eliminada`);
+      } else {
+        throw new Error('Error removing tag');
+      }
+    } catch {
+      toast.error('No se pudo eliminar la etiqueta');
+      setEtiquetas(normalizeTags(selected.etiquetas || []));
+    }
   };
 
   const saveProspecto = async () => {
@@ -632,6 +699,21 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                       <p className="text-xs text-slate-500 mt-0.5">
                         {getConversationChannel(conversation) === 'WhatsApp' ? (conversation.telefono || 'Sin teléfono') : `${getConversationChannel(conversation)}`}
                       </p>
+                      {!!conversation.etiquetas?.length && (
+                        <div className="flex flex-wrap gap-1 mt-1 max-w-[200px]">
+                          {conversation.etiquetas.slice(0, 3).map(tag => (
+                            <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-[9px] font-bold text-emerald-700">
+                              <Tag className="w-2.5 h-2.5" />
+                              {tag}
+                            </span>
+                          ))}
+                          {conversation.etiquetas.length > 3 && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-slate-50 border border-slate-200 text-[9px] font-bold text-slate-500">
+                              +{conversation.etiquetas.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="shrink-0 flex flex-col items-end gap-1">
                       {unread > 0 && (
@@ -642,21 +724,6 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                       <span className="px-2 py-0.5 rounded-full border text-[10px] font-black bg-sky-50 text-sky-700 border-sky-200">
                         {conversation.estado}
                       </span>
-                      {!!conversation.etiquetas?.length && (
-                        <div className="flex flex-wrap justify-end gap-1 max-w-[140px]">
-                          {conversation.etiquetas.slice(0, 3).map(tag => (
-                            <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-emerald-100 text-[10px] font-bold text-emerald-700">
-                              <Tag className="w-3 h-3" />
-                              {tag}
-                            </span>
-                          ))}
-                          {conversation.etiquetas.length > 3 && (
-                            <span className="px-2 py-0.5 rounded-full bg-white border border-slate-100 text-[10px] font-bold text-slate-500">
-                              +{conversation.etiquetas.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      )}
                       {conversation.asignado_a && (
                         <span className="text-[10px] text-violet-500 font-semibold">↩ {conversation.asignado_a}</span>
                       )}
@@ -683,28 +750,101 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
         {/* 1. EL CONTENEDOR PRINCIPAL DE LA COLUMNA */}
         <div className="flex flex-col h-full min-h-0 min-w-0 bg-chat-bg overflow-hidden">
           {/* 2. EL HEADER (Fijo) */}
-          <div className="flex-none h-[72px] px-6 flex items-center justify-between border-b border-slate-200 bg-white">
+          <div className="flex-none min-h-[72px] py-3 px-6 flex items-center justify-between border-b border-slate-200 bg-white">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full bg-[#002d2b] flex items-center justify-center text-white font-bold flex-none">
                 {selected ? displayName(selected).charAt(0) : 'W'}
               </div>
               <div className="min-w-0">
                 <h3 className="font-black text-slate-900 truncate">{selected ? displayName(selected) : 'Selecciona una conversacion'}</h3>
-                <div className="flex items-center gap-2">
-                  {selected && getConversationChannel(selected) === 'Facebook' && <Facebook className="w-3.5 h-3.5 text-blue-600" />}
-                  {selected && getConversationChannel(selected) === 'Instagram' && <Instagram className="w-3.5 h-3.5 text-pink-600" />}
-                  {selected && getConversationChannel(selected) === 'WhatsApp' && <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />}
-                  <p className="text-xs text-slate-500">
-                    {selected ? (getConversationChannel(selected) === 'WhatsApp' ? (selected.telefono || 'Sin teléfono') : `${getConversationChannel(selected)}`) : 'Bandeja de entrada'}
-                  </p>
+                <div className="flex flex-col gap-1 mt-0.5">
+                  <div className="flex items-center gap-2">
+                    {selected && getConversationChannel(selected) === 'Facebook' && <Facebook className="w-3.5 h-3.5 text-blue-600" />}
+                    {selected && getConversationChannel(selected) === 'Instagram' && <Instagram className="w-3.5 h-3.5 text-pink-600" />}
+                    {selected && getConversationChannel(selected) === 'WhatsApp' && <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />}
+                    <p className="text-xs text-slate-500">
+                      {selected ? (getConversationChannel(selected) === 'WhatsApp' ? (selected.telefono || 'Sin teléfono') : `${getConversationChannel(selected)}`) : 'Bandeja de entrada'}
+                    </p>
+                    {selected && (
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => loadMessages(selected.id, { resolveContact: true })} 
+                          className="p-1 rounded bg-slate-100 text-slate-400 hover:text-[#00968f] transition-colors" 
+                          title="Sincronizar contacto"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => markConversationUnread(selected.id)} 
+                          className="p-1 rounded bg-slate-100 text-slate-400 hover:text-[#00968f] transition-colors" 
+                          title="Marcar como no leído"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   {selected && (
-                    <button 
-                      onClick={() => loadMessages(selected.id, { resolveContact: true })} 
-                      className="p-1 rounded bg-slate-100 text-slate-400 hover:text-[#00968f]" 
-                      title="Sincronizar contacto"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      {etiquetas.map(tag => (
+                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-700">
+                          <Tag className="w-2.5 h-2.5" />
+                          {tag}
+                          {canEdit && (
+                            <button type="button" onClick={() => removeTag(tag)} className="text-emerald-500 hover:text-red-500 ml-0.5 flex items-center justify-center" title="Quitar etiqueta">
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                      {canEdit && (
+                        <div className="flex items-center gap-1">
+                          {showInlineTagInput ? (
+                            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2 py-0.5 shadow-sm">
+                              <input
+                                ref={inlineTagInputRef}
+                                type="text"
+                                value={inlineTagDraft}
+                                onChange={e => setInlineTagDraft(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (inlineTagDraft.trim()) {
+                                      void addTag(inlineTagDraft.trim());
+                                      setInlineTagDraft('');
+                                      setShowInlineTagInput(false);
+                                    }
+                                  } else if (e.key === 'Escape') {
+                                    setShowInlineTagInput(false);
+                                    setInlineTagDraft('');
+                                  }
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => {
+                                    if (inlineTagDraft.trim()) {
+                                      void addTag(inlineTagDraft.trim());
+                                    }
+                                    setInlineTagDraft('');
+                                    setShowInlineTagInput(false);
+                                  }, 150);
+                                }}
+                                placeholder="Nueva etiqueta..."
+                                className="text-[10px] font-bold outline-none w-24 bg-transparent text-slate-800"
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowInlineTagInput(true)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold text-slate-600 transition-colors"
+                              title="Agregar etiqueta"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                              Etiqueta
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
