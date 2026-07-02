@@ -914,17 +914,24 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                   <div className="text-sm leading-relaxed whitespace-pre-wrap break-words text-left">
                     {(() => {
                       const text = message.cuerpo_mensaje;
-                      const match = text.match(/^\[Adjunto (image|video|audio|document)\]\((https?:\/\/[^\)]+)\)$/i);
+                      const match = text.match(/^\[Adjunto (image|video|audio|document)\]\(([^\)]+)\)$/i);
                       if (match) {
                         const [, type, url] = match;
-                        if (type.toLowerCase() === 'image') return <img src={url} alt="Adjunto" className="max-w-full rounded-lg max-h-64 object-contain" />;
-                        if (type.toLowerCase() === 'video') return <video src={url} controls className="max-w-full rounded-lg max-h-64" />;
-                        if (type.toLowerCase() === 'audio') return <audio src={url} controls className="max-w-full" />;
+                        let finalUrl = url;
+                        if (url.startsWith('/')) {
+                          finalUrl = `${apiUrl}${url}`;
+                        } else if (url.includes('/api/whatsapp/media/')) {
+                          const filename = url.split('/api/whatsapp/media/').pop();
+                          finalUrl = `${apiUrl}/api/whatsapp/media/${filename}`;
+                        }
+                        if (type.toLowerCase() === 'image') return <img src={finalUrl} alt="Adjunto" className="max-w-full rounded-lg max-h-64 object-contain" />;
+                        if (type.toLowerCase() === 'video') return <video src={finalUrl} controls className="max-w-full rounded-lg max-h-64" />;
+                        if (type.toLowerCase() === 'audio') return <audio src={finalUrl} controls className="max-w-full" />;
                         if (type.toLowerCase() === 'document') {
                           const filename = decodeURIComponent(url.split('/').pop() || 'documento');
                           return (
                             <a 
-                              href={url} 
+                              href={finalUrl} 
                               target="_blank" 
                               rel="noopener noreferrer" 
                               className="flex items-center gap-2 p-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-800 font-bold transition-all text-xs border border-slate-200 shadow-sm max-w-xs"
