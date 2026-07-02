@@ -1084,7 +1084,7 @@ export default function WhatsAppInbox({ apiUrl, estados, canEdit, onCrmChanged, 
                   />
                   <button
                     type="button"
-                    onClick={addTag}
+                    onClick={() => addTag()}
                     disabled={!canEdit || !tagDraft.trim()}
                     className="h-10 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-[#00968f] disabled:opacity-50"
                   >
